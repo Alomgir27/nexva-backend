@@ -115,6 +115,12 @@ export const UI = {
       </div>
     `;
     document.body.appendChild(container);
+    
+    // Initialize mode switcher visibility (show for text tab by default)
+    const modeSwitcherContainer = document.querySelector('.nexva-mode-switcher-container');
+    if (modeSwitcherContainer) {
+      modeSwitcherContainer.style.display = 'flex';
+    }
   },
   
   toggleChat: function(isOpen) {
