@@ -148,10 +148,10 @@ if [ -f "requirements.txt" ]; then
     echo "   ✅ Dependencies installed"
 fi
 
-# echo ""
-# echo "🤖 Loading ML Models..."
-# python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" 2>/dev/null && echo "   ✅ Whisper ready" || echo "   ⚠️  Will load on first use"
-# python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" 2>/dev/null && echo "   ✅ Embeddings ready" || echo "   ⚠️  Will load on first use"
+echo ""
+echo "🤖 Loading ML Models..."
+python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" 2>/dev/null && echo "   ✅ Whisper ready" || echo "   ⚠️  Will load on first use"
+python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" 2>/dev/null && echo "   ✅ Embeddings ready" || echo "   ⚠️  Will load on first use"
 
 echo ""
 echo "🗄️  Initializing database..."
