@@ -7,7 +7,7 @@ echo "║    Nexva Backend Setup (RunPod)        ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 
-PORT=7270
+PORT=5000
 
 echo "🧹 Cleaning up..."
 find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
