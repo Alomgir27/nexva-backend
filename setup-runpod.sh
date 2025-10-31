@@ -7,7 +7,7 @@ echo "║    Nexva Backend Setup (RunPod)        ║"
 echo "╔════════════════════════════════════════╗"
 echo ""
 
-PORT=8001
+PORT=8080
 
 echo "🧹 Cleaning up..."
 find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
@@ -16,21 +16,33 @@ find . -name '*.pyc' -delete 2>/dev/null || true
 echo "🔪 Checking port $PORT..."
 apt-get install -y lsof psmisc >/dev/null 2>&1 || true
 
-PID_ON_PORT=$(lsof -ti:$PORT 2>/dev/null | head -1)
-if [ -n "$PID_ON_PORT" ]; then
-    CMD=$(ps -p $PID_ON_PORT -o cmd= 2>/dev/null || true)
-    if echo "$CMD" | grep -q "uvicorn.*main:app"; then
-        echo "   Killing old Nexva backend (PID: $PID_ON_PORT)"
-        kill -9 $PID_ON_PORT 2>/dev/null || true
-        sleep 2
-    else
-        echo "   ❌ Port $PORT already in use by another service"
+PORT_INFO=$(ss -tulpn 2>/dev/null | grep ":$PORT " || true)
+if [ -n "$PORT_INFO" ]; then
+    PID=$(echo "$PORT_INFO" | grep -oP 'pid=\K[0-9]+' | head -1)
+    if [ -n "$PID" ]; then
+        CMD=$(ps -p $PID -o cmd= 2>/dev/null || echo "unknown")
+        echo "   Found process on port $PORT (PID: $PID)"
         echo "   Process: $CMD"
-        exit 1
+        
+        if echo "$CMD" | grep -qE "uvicorn|python.*main"; then
+            echo "   Killing old backend process..."
+            kill -9 $PID 2>/dev/null || true
+            sleep 2
+        else
+            echo "   ❌ Port $PORT in use by non-Nexva service"
+            echo "   Run: kill -9 $PID  or change PORT in script"
+            exit 1
+        fi
+    else
+        echo "   Warning: Port $PORT in use but PID not found, attempting force kill..."
+        fuser -k $PORT/tcp 2>/dev/null || true
+        sleep 2
     fi
+else
+    echo "   ✅ Port $PORT is available"
 fi
 
-pkill -f "nexva-backend.*uvicorn.*main:app" 2>/dev/null || true
+pkill -f "/workspace/nexva-backend.*uvicorn" 2>/dev/null || true
 sleep 1
 
 echo ""
