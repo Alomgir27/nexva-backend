@@ -161,10 +161,29 @@ echo "╔═══════════════════════�
 echo "║         Starting Nexva Backend         ║"
 echo "╔════════════════════════════════════════╗"
 echo ""
-echo "🚀 Backend API: http://localhost:$PORT"
+echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
+echo ""
+echo "📝 Server running in background..."
+echo "   • View logs: tail -f nohup.out"
+echo "   • Stop server: pkill -f 'uvicorn main:app'"
 echo ""
 
 source venv/bin/activate
-exec uvicorn main:app --reload --host 0.0.0.0 --port $PORT
+nohup uvicorn main:app --reload --host 0.0.0.0 --port $PORT > nohup.out 2>&1 &
+BACKEND_PID=$!
+
+sleep 3
+
+if ps -p $BACKEND_PID > /dev/null 2>&1; then
+    echo "✅ Backend started successfully (PID: $BACKEND_PID)"
+    echo ""
+    echo "🌐 Access your API:"
+    echo "   Local: http://localhost:$PORT"
+    echo "   RunPod: Check your RunPod dashboard for proxy URL"
+    echo ""
+else
+    echo "❌ Backend failed to start. Check logs: cat nohup.out"
+    exit 1
+fi
 
