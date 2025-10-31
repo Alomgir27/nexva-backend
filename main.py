@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, List
 from contextlib import asynccontextmanager
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 import models
 import search
 import scraper
@@ -25,6 +26,8 @@ import shutil
 
 from neural_tts_service import neural_tts
 
+scrape_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="scraper")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     models.init_db()
@@ -33,6 +36,9 @@ async def lifespan(app: FastAPI):
     search.get_embedding_model()
     print("✅ All models loaded and ready")
     yield
+    print("🛑 Shutting down scraper threads...")
+    scrape_executor.shutdown(wait=False)
+    print("✅ Cleanup complete")
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)
 
@@ -249,7 +255,6 @@ def update_chatbot_voice(
 @app.post("/api/domains", response_model=DomainResponse)
 async def create_domain(
     domain_data: DomainCreate,
-    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(auth_service.get_current_user),
     db: Session = Depends(models.get_db)
 ):
@@ -260,22 +265,18 @@ async def create_domain(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
-    # Create domain immediately
     domain = models.Domain(chatbot_id=domain_data.chatbot_id, url=domain_data.url, status="scraping")
     db.add(domain)
     db.commit()
     db.refresh(domain)
     
-    # Create scrape job
     job = models.ScrapeJob(domain_id=domain.id, status="pending")
     db.add(job)
     db.commit()
     db.refresh(job)
     
-    # Add to background tasks - this returns immediately!
-    background_tasks.add_task(run_domain_scraping, job.id, domain.id, domain_data.url)
+    scrape_executor.submit(run_domain_scraping, job.id, domain.id, domain_data.url)
     
-    # Return immediately - scraping continues in background
     return domain
 
 @app.get("/api/domains/{chatbot_id}", response_model=List[DomainResponse])
@@ -521,23 +522,30 @@ def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
     Background task for domain scraping.
     Runs in background thread - does not block API responses.
     """
+    print(f"🚀 Starting scrape: job_id={job_id}, domain_id={domain_id}, url={start_url}")
     db = models.SessionLocal()
+    job = None
+    domain = None
+    
     try:
         job = db.query(models.ScrapeJob).filter(models.ScrapeJob.id == job_id).first()
         domain = db.query(models.Domain).filter(models.Domain.id == domain_id).first()
         
         if not job or not domain:
-            print(f"Job or domain not found: job_id={job_id}, domain_id={domain_id}")
+            print(f"❌ Job or domain not found: job_id={job_id}, domain_id={domain_id}")
             return
         
+        print(f"📊 Starting scraping job for {start_url}")
         job.status = "running"
         domain.status = "scraping"
         db.commit()
         
+        print(f"🔧 Initializing WebScraper...")
         web_scraper = scraper.WebScraper()
+        
+        print(f"🌐 Scraping domain: {start_url}")
         pages = web_scraper.scrape_domain(start_url, domain_id, db)
         
-        # Refresh domain object to get latest state
         db.refresh(domain)
         
         job.status = "completed"
@@ -551,14 +559,23 @@ def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
         
         db.commit()
         print(f"✅ Scraping completed: {len(pages)} pages scraped from {start_url}")
+        
     except Exception as e:
-        print(f"Scraping error for domain {domain_id}: {e}")
-        if job:
-            job.status = "failed"
-            job.error = str(e)
-        if domain:
-            domain.status = "failed"
-        db.commit()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Scraping error for domain {domain_id}: {e}")
+        print(f"❌ Full traceback:\n{error_details}")
+        
+        try:
+            if job:
+                job.status = "failed"
+                job.error = str(e)
+            if domain:
+                domain.status = "failed"
+            db.commit()
+        except Exception as commit_error:
+            print(f"❌ Error updating job/domain status: {commit_error}")
+            
     finally:
         db.close()
 

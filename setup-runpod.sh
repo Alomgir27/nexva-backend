@@ -55,8 +55,8 @@ service postgresql restart || service postgresql start || true
 sleep 3
 
 # Idempotent user/database creation
-su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='admin'\" | grep -q 1 || psql -c \"CREATE USER admin WITH PASSWORD 'admin123' SUPERUSER;\"" 2>/dev/null || true
-su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='products_db'\" | grep -q 1 || psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
+# su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='admin'\" | grep -q 1 || psql -c \"CREATE USER admin WITH PASSWORD 'admin123' SUPERUSER;\"" 2>/dev/null || true
+# su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='products_db'\" | grep -q 1 || psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
 echo "   ✅ PostgreSQL ready"
 
 echo ""

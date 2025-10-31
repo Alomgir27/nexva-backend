@@ -24,19 +24,29 @@ class WebScraper:
         self.max_retries = 3
         
     def _get_driver(self):
-        options = Options()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        options.page_load_strategy = 'normal'
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.set_page_load_timeout(30)
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        return driver
+        print(f"🔧 Initializing Chrome WebDriver...")
+        try:
+            options = Options()
+            options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            options.page_load_strategy = 'normal'
+            
+            print(f"📦 Installing ChromeDriver...")
+            service = Service(ChromeDriverManager().install())
+            
+            print(f"🚀 Starting Chrome browser...")
+            driver = webdriver.Chrome(service=service, options=options)
+            driver.set_page_load_timeout(30)
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            print(f"✅ Chrome WebDriver ready")
+            return driver
+        except Exception as e:
+            print(f"❌ Failed to initialize Chrome WebDriver: {e}")
+            raise
     
     def _normalize_url(self, url: str) -> str:
         parsed = urlparse(url)
