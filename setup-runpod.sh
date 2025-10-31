@@ -23,18 +23,12 @@ if [ -n "$PORT_INFO" ]; then
         CMD=$(ps -p $PID -o cmd= 2>/dev/null || echo "unknown")
         echo "   Found process on port $PORT (PID: $PID)"
         echo "   Process: $CMD"
-        
-        if echo "$CMD" | grep -qE "uvicorn|python.*main"; then
-            echo "   Killing old backend process..."
-            kill -9 $PID 2>/dev/null || true
-            sleep 2
-        else
-            echo "   ❌ Port $PORT in use by non-Nexva service"
-            echo "   Run: kill -9 $PID  or change PORT in script"
-            exit 1
-        fi
+        echo "   Killing process to free port..."
+        kill -9 $PID 2>/dev/null || true
+        sleep 2
+        echo "   ✅ Port $PORT freed"
     else
-        echo "   Warning: Port $PORT in use but PID not found, attempting force kill..."
+        echo "   Warning: Port $PORT in use but PID not found, force killing..."
         fuser -k $PORT/tcp 2>/dev/null || true
         sleep 2
     fi
