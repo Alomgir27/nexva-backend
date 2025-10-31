@@ -3,7 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin, urlparse
 import time
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -13,17 +13,27 @@ import tempfile
 import os
 import re
 import gc
+from threading import Lock
 from pydub import AudioSegment
 from transcription_service import transcribe_audio_file
 import yt_dlp
 
+_DRIVER_PATH = os.environ.get("CHROMEDRIVER_PATH")
+_DRIVER_PATH_LOCK = Lock()
+
+
 class WebScraper:
-    def __init__(self, max_pages: int = 1000):
+    def __init__(self, max_pages: int = 1000, process_media: Optional[bool] = None):
         self.max_pages = max_pages
         self.visited = set()
         self.failed_attempts = {}
         self.max_retries = 3
         self.driver = None
+        self._driver_options = None
+        if process_media is None:
+            self.process_media = os.getenv("ENABLE_MEDIA_SCRAPE", "false").lower() == "true"
+        else:
+            self.process_media = process_media
         
     def _get_driver(self):
         if self.driver:
@@ -31,23 +41,34 @@ class WebScraper:
         
         print(f"🔧 Initializing Chrome WebDriver...")
         try:
-            options = Options()
-            options.add_argument('--headless')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-logging')
-            options.add_argument('--log-level=3')
-            options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-            options.page_load_strategy = 'normal'
-            
-            print(f"📦 Installing ChromeDriver...")
-            service = Service(ChromeDriverManager().install())
-            
+            if not self._driver_options:
+                options = Options()
+                options.add_argument('--headless')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--disable-dev-shm-usage')
+                options.add_argument('--disable-gpu')
+                options.add_argument('--disable-blink-features=AutomationControlled')
+                options.add_argument('--disable-extensions')
+                options.add_argument('--disable-logging')
+                options.add_argument('--log-level=3')
+                options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+                options.page_load_strategy = 'normal'
+                self._driver_options = options
+
+            global _DRIVER_PATH
+            if not _DRIVER_PATH:
+                with _DRIVER_PATH_LOCK:
+                    if not _DRIVER_PATH:
+                        print("📦 Installing ChromeDriver...")
+                        _DRIVER_PATH = ChromeDriverManager().install()
+
+            if not os.path.exists(_DRIVER_PATH):
+                raise FileNotFoundError(f"ChromeDriver not found at {_DRIVER_PATH}")
+
+            service = Service(_DRIVER_PATH)
+
             print(f"🚀 Starting Chrome browser...")
-            self.driver = webdriver.Chrome(service=service, options=options)
+            self.driver = webdriver.Chrome(service=service, options=self._driver_options)
             self.driver.set_page_load_timeout(15)
             self.driver.set_script_timeout(10)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
@@ -71,6 +92,10 @@ class WebScraper:
             subprocess.run(['pkill', '-f', 'chrome'], capture_output=True, timeout=5)
         except:
             pass
+
+    def _restart_driver(self):
+        self._cleanup_driver()
+        return self._get_driver()
     
     def _normalize_url(self, url: str) -> str:
         parsed = urlparse(url)
@@ -420,17 +445,20 @@ class WebScraper:
                     soup = BeautifulSoup(page_source, 'lxml')
                     content_data = self._extract_content(soup)
                     
-                    media_files = self._extract_media_urls(soup, url)
-                    if media_files:
-                        print(f"🎬 Found {len(media_files)} media file(s) on {url}")
-                    media_urls = [m['url'] for m in media_files]
+                    media_urls = []
                     media_transcriptions = []
-                    
-                    for media in media_files:
-                        result = self._process_media_file(media['url'], media['type'])
-                        if result:
-                            media_transcriptions.append(result)
-                            content_data['content'] += f"\n\n[{media['type'].upper()} TRANSCRIPTION from {result['url']}]: {result['transcription']}"
+
+                    if self.process_media:
+                        media_files = self._extract_media_urls(soup, url)
+                        if media_files:
+                            print(f"🎬 Found {len(media_files)} media file(s) on {url}")
+                        media_urls = [m['url'] for m in media_files]
+
+                        for media in media_files:
+                            result = self._process_media_file(media['url'], media['type'])
+                            if result:
+                                media_transcriptions.append(result)
+                                content_data['content'] += f"\n\n[{media['type'].upper()} TRANSCRIPTION from {result['url']}]: {result['transcription']}"
                     
                     links = soup.find_all('a', href=True)[:100]
                     
@@ -466,9 +494,8 @@ class WebScraper:
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
                         
                         if pages_since_driver_refresh >= 20:
-                            print(f"🔄 Refreshing driver after 20 pages...")
-                            self._cleanup_driver()
-                            driver = self._get_driver()
+                            print("🔄 Refreshing driver after 20 pages...")
+                            driver = self._restart_driver()
                             pages_since_driver_refresh = 0
                         
                         if len(pages_batch) >= 5:

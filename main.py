@@ -541,7 +541,8 @@ def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
         db.commit()
         
         print(f"🔧 Initializing WebScraper...")
-        web_scraper = scraper.WebScraper()
+        enable_media = os.getenv("ENABLE_MEDIA_SCRAPE", "false").lower() == "true"
+        web_scraper = scraper.WebScraper(enable_media=enable_media)
         
         print(f"🌐 Scraping domain: {start_url}")
         pages = web_scraper.scrape_domain(start_url, domain_id, db)

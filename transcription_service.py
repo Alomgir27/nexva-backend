@@ -3,17 +3,27 @@ import json
 import base64
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
-import numpy as np
 import tempfile
 import os
-import wave
+from threading import Lock
 
-whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+_whisper_model = None
+_whisper_lock = Lock()
+
+
+def get_whisper_model() -> WhisperModel:
+    global _whisper_model
+    if _whisper_model is None:
+        with _whisper_lock:
+            if _whisper_model is None:
+                _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+    return _whisper_model
 
 def transcribe_audio_file(audio_path: str, language: str = None) -> str:
     """Transcribe audio file using Whisper. Auto-detects language if not specified."""
     try:
-        segments, info = whisper_model.transcribe(
+        model = get_whisper_model()
+        segments, info = model.transcribe(
             audio_path,
             language=language,
             beam_size=5,
