@@ -6,7 +6,24 @@ export const Utils = {
   },
   
   generateSessionId: function() {
-    return 'widget-' + Date.now();
+    return 'widget-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  },
+  
+  getOrCreateSessionId: function(apiKey) {
+    try {
+      const key = `nexva_session_${apiKey}`;
+      let sessionId = localStorage.getItem(key);
+      
+      if (!sessionId) {
+        sessionId = this.generateSessionId();
+        localStorage.setItem(key, sessionId);
+      }
+      
+      return sessionId;
+    } catch (e) {
+      console.error('Failed to get/create session ID:', e);
+      return this.generateSessionId();
+    }
   },
   
   saveConversationId: function(apiKey, conversationId) {

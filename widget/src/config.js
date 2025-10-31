@@ -9,16 +9,27 @@ export const Config = {
     enableVoice: true,
     enableHumanSupport: true,
     autoOpen: false,
-    theme: 'light',
+    theme: 'dark',
     borderRadius: '12px',
-    buttonIcon: 'chat',
-    buttonSize: '60px',
-    buttonColor: null
+    presetQuestions: [],
+    bubble: {
+      backgroundColor: '#32f08c',
+      size: '60px',
+      shape: 'circle',
+      icon: 'chat',
+      iconColor: '#ffffff',
+      customIconUrl: '',
+      shadow: true,
+      animation: 'pulse'
+    }
   },
   
   init: function(apiKey, options) {
     options = options || {};
     const primaryColor = options.primaryColor || this.defaults.primaryColor;
+    const bubbleDefaults = this.defaults.bubble;
+    const bubbleOptions = options.bubble || {};
+    
     return {
       apiKey: apiKey,
       apiUrl: options.apiUrl || this.defaults.apiUrl,
@@ -32,9 +43,17 @@ export const Config = {
       autoOpen: options.autoOpen || false,
       theme: options.theme || this.defaults.theme,
       borderRadius: options.borderRadius || this.defaults.borderRadius,
-      buttonIcon: options.buttonIcon || this.defaults.buttonIcon,
-      buttonSize: options.buttonSize || this.defaults.buttonSize,
-      buttonColor: options.buttonColor || primaryColor
+      presetQuestions: options.presetQuestions || this.defaults.presetQuestions,
+      bubble: {
+        backgroundColor: bubbleOptions.backgroundColor || bubbleDefaults.backgroundColor,
+        size: bubbleOptions.size || bubbleDefaults.size,
+        shape: bubbleOptions.shape || bubbleDefaults.shape,
+        icon: bubbleOptions.icon || bubbleDefaults.icon,
+        iconColor: bubbleOptions.iconColor || bubbleDefaults.iconColor,
+        customIconUrl: bubbleOptions.customIconUrl || bubbleDefaults.customIconUrl,
+        shadow: bubbleOptions.shadow !== undefined ? bubbleOptions.shadow : bubbleDefaults.shadow,
+        animation: bubbleOptions.animation || bubbleDefaults.animation
+      }
     };
   }
 };

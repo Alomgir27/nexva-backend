@@ -18,6 +18,8 @@ class User(Base):
     password_hash = Column(String(255))
     oauth_provider = Column(String(50))
     oauth_id = Column(String(255))
+    stripe_customer_id = Column(String(255), nullable=True, index=True)
+    subscription_tier = Column(String(50), default="free")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Chatbot(Base):
@@ -58,6 +60,21 @@ class ScrapedPage(Base):
     tags = Column(JSON, default=[])
     last_updated = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class DomainDocument(Base):
+    __tablename__ = "domain_documents"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    domain_id = Column(Integer, ForeignKey("domains.id"), nullable=False, index=True)
+    filename = Column(String(500), nullable=False)
+    file_path = Column(String(1000), nullable=False)
+    file_type = Column(String(50), nullable=False)
+    file_size = Column(Integer, nullable=False)
+    title = Column(String(500))
+    content_preview = Column(Text)
+    word_count = Column(Integer, default=0)
+    status = Column(String(20), default="processing")
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -116,6 +133,19 @@ class ScrapeJob(Base):
     error = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    stripe_customer_id = Column(String(255), nullable=False, index=True)
+    stripe_subscription_id = Column(String(255), nullable=False, unique=True, index=True)
+    plan_tier = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False)
+    current_period_end = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 def init_db():
     Base.metadata.create_all(bind=engine)

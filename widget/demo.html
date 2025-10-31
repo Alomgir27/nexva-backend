@@ -65,6 +65,8 @@
         <li>✅ Proper message storage</li>
         <li>✅ WebSocket streaming responses</li>
         <li>✅ Human support request</li>
+        <li>✅ AI/Human mode switcher</li>
+        <li>✅ Preset questions for quick start</li>
         <li>✅ Clean modular architecture</li>
       </ul>
     </div>
@@ -74,16 +76,32 @@
   <script type="module">
     // Initialize the widget
     // Note: Replace 'test-key-123' with a valid API key from your dashboard
-    NexvaChat.init('7qjoBizhjGt28MFRoT4ME8a8zVr_EIHXvNyyTCmWtFk', {
+    NexvaChat.init('cvEVs2U0ek-bmTwGeZgbdBxcL7ofbZMLSPOAkMCZ50s', {
       apiUrl: 'http://localhost:8000',
       logoUrl: './images/img.png',
       primaryColor: '#32f08c',
-      welcomeMessage: 'Hi! How can I help you today?',
+      headerText: 'Nexva Chat',
+      welcomeMessage: '👋 Hi! How can I help you today?',
       placeholder: 'Type your message...',
       enableVoice: true,
       enableHumanSupport: true,
       theme: 'dark',
-      autoOpen: false
+      autoOpen: false,
+      presetQuestions: [
+        'What services do you offer?',
+        'How can I get started?',
+        'What are your pricing plans?',
+        'Do you have customer support?'
+      ],
+      bubble: {
+        backgroundColor: '#32f08c',
+        size: '60px',
+        shape: 'circle',
+        icon: 'chat',
+        iconColor: '#ffffff',
+        shadow: true,
+        animation: 'pulse'
+      }
     });
   </script>
 </body>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -16,7 +16,12 @@ import auth_service
 import realtime_voice_service
 import transcription_service
 import email_service
+import document_service
+import stripe_service
+import plan_config
 import asyncio
+import os
+import shutil
 
 from neural_tts_service import neural_tts
 
@@ -90,6 +95,28 @@ class ScrapedPageResponse(BaseModel):
     tags: Optional[List[str]] = []
     last_updated: datetime
 
+class DocumentResponse(BaseModel):
+    id: int
+    domain_id: int
+    filename: str
+    file_type: str
+    file_size: int
+    title: Optional[str]
+    content_preview: Optional[str]
+    word_count: int
+    status: str
+    uploaded_at: datetime
+
+class CheckoutSessionCreate(BaseModel):
+    plan_tier: str
+
+class SubscriptionInfo(BaseModel):
+    plan_tier: str
+    status: str
+    chatbot_count: int
+    chatbot_limit: int
+    current_period_end: Optional[datetime]
+
 # Support Models
 class SupportMemberInvite(BaseModel):
     email: EmailStr
@@ -153,6 +180,15 @@ def create_chatbot(
     current_user: models.User = Depends(auth_service.get_current_user),
     db: Session = Depends(models.get_db)
 ):
+    current_count = db.query(models.Chatbot).filter(models.Chatbot.user_id == current_user.id).count()
+    
+    if not plan_config.can_create_chatbot(current_count, current_user.subscription_tier):
+        plan = plan_config.get_plan_limits(current_user.subscription_tier)
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Chatbot limit reached. Your {plan['name']} plan allows {plan['chatbot_limit']} chatbot(s). Please upgrade your plan."
+        )
+    
     db_chatbot = models.Chatbot(user_id=current_user.id, **chatbot.dict())
     db.add(db_chatbot)
     db.commit()
@@ -321,9 +357,161 @@ def delete_domain(
     db.query(models.ScrapedPage).filter(models.ScrapedPage.domain_id == domain_id).delete()
     db.query(models.ScrapeJob).filter(models.ScrapeJob.domain_id == domain_id).delete()
     
+    documents = db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).all()
+    for doc in documents:
+        if os.path.exists(doc.file_path):
+            os.remove(doc.file_path)
+        document_service.delete_document_from_index(chatbot.id, doc.id)
+    db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).delete()
+    
     db.delete(domain)
     db.commit()
     return {"message": "Domain deleted successfully"}
+
+@app.post("/api/domains/{domain_id}/documents", response_model=DocumentResponse)
+async def upload_document(
+    domain_id: int,
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    domain = db.query(models.Domain).filter(models.Domain.id == domain_id).first()
+    if not domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == domain.chatbot_id,
+        models.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Not authorized")
+    
+    allowed_types = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
+    if file.content_type not in allowed_types and not any(file.filename.endswith(ext) for ext in ['.pdf', '.docx', '.txt']):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF, DOCX, and TXT are allowed")
+    
+    upload_dir = f"uploads/documents/{domain_id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    file_size = os.path.getsize(file_path)
+    
+    document = models.DomainDocument(
+        domain_id=domain_id,
+        filename=file.filename,
+        file_path=file_path,
+        file_type=file.content_type or 'application/octet-stream',
+        file_size=file_size,
+        status='processing'
+    )
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    
+    success = document_service.process_document(document.id, file_path, file.content_type, chatbot.id, domain_id, db)
+    if not success:
+        db.delete(document)
+        db.commit()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail="Failed to process document")
+    
+    db.refresh(document)
+    return document
+
+@app.get("/api/domains/{domain_id}/documents", response_model=Dict)
+def list_documents(
+    domain_id: int,
+    page: int = 1,
+    per_page: int = 10,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    domain = db.query(models.Domain).filter(models.Domain.id == domain_id).first()
+    if not domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == domain.chatbot_id,
+        models.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Not authorized")
+    
+    offset = (page - 1) * per_page
+    documents = db.query(models.DomainDocument).filter(
+        models.DomainDocument.domain_id == domain_id
+    ).order_by(models.DomainDocument.uploaded_at.desc()).offset(offset).limit(per_page).all()
+    
+    total = db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).count()
+    
+    return {
+        "documents": documents,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": (total + per_page - 1) // per_page
+    }
+
+@app.get("/api/documents/{document_id}/download")
+def download_document(
+    document_id: int,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    document = db.query(models.DomainDocument).filter(models.DomainDocument.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    domain = db.query(models.Domain).filter(models.Domain.id == document.domain_id).first()
+    if not domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == domain.chatbot_id,
+        models.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Not authorized")
+    
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(document.file_path, filename=document.filename)
+
+@app.delete("/api/documents/{document_id}")
+def delete_document(
+    document_id: int,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    document = db.query(models.DomainDocument).filter(models.DomainDocument.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    domain = db.query(models.Domain).filter(models.Domain.id == document.domain_id).first()
+    if not domain:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == domain.chatbot_id,
+        models.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Not authorized")
+    
+    if os.path.exists(document.file_path):
+        os.remove(document.file_path)
+    
+    document_service.delete_document_from_index(chatbot.id, document.id)
+    
+    db.delete(document)
+    db.commit()
+    
+    return {"message": "Document deleted successfully"}
 
 def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
     """
@@ -713,12 +901,14 @@ async def switch_conversation_mode(
         raise HTTPException(status_code=400, detail="Invalid mode")
     
     if new_mode == "human":
+        # Check for existing open or in_progress ticket for this conversation
         active_ticket = db.query(models.SupportTicket).filter(
             models.SupportTicket.conversation_id == conversation_id,
-            models.SupportTicket.status == "pending"
+            models.SupportTicket.status.in_(["open", "in_progress"])
         ).first()
         
         if not active_ticket:
+            # No active ticket exists, create a new one
             ticket = models.SupportTicket(
                 conversation_id=conversation_id,
                 chatbot_id=conversation.chatbot_id
@@ -751,6 +941,7 @@ async def switch_conversation_mode(
                     last_message.content if last_message else "New support request"
                 )
         else:
+            # Reuse existing active ticket
             conversation.ticket_id = active_ticket.id
     
     conversation.mode = new_mode
@@ -832,6 +1023,83 @@ def send_support_message(
     db.refresh(message)
     
     return {"message": "Message sent", "id": message.id}
+
+# Billing Endpoints
+@app.post("/api/billing/create-checkout-session")
+async def create_checkout_session(
+    session_data: CheckoutSessionCreate,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    if session_data.plan_tier not in ['basic', 'pro', 'enterprise']:
+        raise HTTPException(status_code=400, detail="Invalid plan tier")
+    
+    success_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing?success=true'
+    cancel_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing?canceled=true'
+    
+    result = stripe_service.create_checkout_session(
+        current_user, session_data.plan_tier, success_url, cancel_url, db
+    )
+    
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+    
+    return result
+
+@app.get("/api/billing/portal-session")
+async def create_portal_session(
+    current_user: models.User = Depends(auth_service.get_current_user)
+):
+    if not current_user.stripe_customer_id:
+        raise HTTPException(status_code=404, detail="No billing account found")
+    
+    return_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing'
+    
+    portal_url = stripe_service.create_portal_session(current_user.stripe_customer_id, return_url)
+    
+    if not portal_url:
+        raise HTTPException(status_code=500, detail="Failed to create portal session")
+    
+    return {"url": portal_url}
+
+@app.get("/api/billing/subscription", response_model=SubscriptionInfo)
+async def get_subscription(
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    chatbot_count = db.query(models.Chatbot).filter(models.Chatbot.user_id == current_user.id).count()
+    plan = plan_config.get_plan_limits(current_user.subscription_tier)
+    
+    subscription = db.query(models.Subscription).filter(
+        models.Subscription.user_id == current_user.id,
+        models.Subscription.status.in_(['active', 'trialing'])
+    ).first()
+    
+    return {
+        "plan_tier": current_user.subscription_tier,
+        "status": subscription.status if subscription else "inactive",
+        "chatbot_count": chatbot_count,
+        "chatbot_limit": plan['chatbot_limit'],
+        "current_period_end": subscription.current_period_end if subscription else None
+    }
+
+@app.post("/api/billing/webhook")
+async def stripe_webhook(
+    request: Request,
+    db: Session = Depends(models.get_db)
+):
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+    
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+    
+    success = stripe_service.handle_webhook(payload, sig_header, db)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Webhook handling failed")
+    
+    return {"status": "success"}
 
 @app.get("/widget.js")
 async def serve_widget():

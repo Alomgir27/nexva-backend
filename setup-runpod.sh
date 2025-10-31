@@ -16,6 +16,17 @@ find . -name '*.pyc' -delete 2>/dev/null || true
 echo "🔪 Freeing port $PORT..."
 apt-get install -y lsof psmisc net-tools ffmpeg >/dev/null 2>&1 || true
 
+echo ""
+echo "📦 Installing Chrome for web scraping..."
+if ! command -v google-chrome &> /dev/null; then
+    wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    apt-get install -y /tmp/google-chrome.deb >/dev/null 2>&1 || true
+    rm -f /tmp/google-chrome.deb
+    echo "   ✅ Chrome installed"
+else
+    echo "   ✅ Chrome already installed"
+fi
+
 # Kill existing processes
 pkill -9 -f "/workspace/nexva-backend.*uvicorn" 2>/dev/null || true
 pkill -9 -f "uvicorn main:app" 2>/dev/null || true

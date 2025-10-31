@@ -8,9 +8,14 @@ export const WebSocketManager = {
   onResponseComplete: null,
   audioQueue: [],
   isPlayingAudio: false,
+  sessionId: null,
+  apiKey: null,
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    
+    this.apiKey = config.apiKey;
+    this.sessionId = Utils.getOrCreateSessionId(config.apiKey);
     
     const protocol = config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = config.apiUrl.replace(/^https?:\/\//, '');
@@ -23,7 +28,7 @@ export const WebSocketManager = {
     this.ws.onopen = () => {
       console.log('[WebSocket] Connected to server');
       const initMessage = {
-        session_id: Utils.generateSessionId()
+        session_id: this.sessionId
       };
       if (existingConversationId) {
         initMessage.conversation_id = existingConversationId;
@@ -84,7 +89,7 @@ export const WebSocketManager = {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ 
         message: message,
-        session_id: Utils.generateSessionId()
+        session_id: this.sessionId
       }));
       return true;
     }

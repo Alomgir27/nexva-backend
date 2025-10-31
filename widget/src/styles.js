@@ -3,57 +3,166 @@ export const Styles = {
     const style = document.createElement('style');
     const primaryColor = config.primaryColor;
     const hoverColor = '#0fdc78';
-    const bgBase = '#0a0b0d';
-    const bgSecondary = '#121314';
-    const bgOverlay = 'rgba(237, 239, 242, 0.04)';
-    const textDefault = '#f5f9fe';
-    const textSecondary = '#a6aab5';
-    const borderColor = 'rgba(255, 255, 255, 0.06)';
     const position = config.position;
     const borderRadius = config.borderRadius;
-    const buttonSize = config.buttonSize;
-    const buttonColor = config.buttonColor;
-    const buttonBorderRadius = config.borderRadius === '0px' ? '0px' : '50%';
+    const theme = config.theme || 'dark';
+    
+    // Bubble configuration
+    const bubbleSize = config.bubble.size;
+    const bubbleColor = config.bubble.backgroundColor;
+    const bubbleShape = config.bubble.shape;
+    const bubbleShadow = config.bubble.shadow;
+    const bubbleAnimation = config.bubble.animation;
+    const bubbleBorderRadius = bubbleShape === 'circle' ? '50%' : bubbleShape === 'rounded' ? '20%' : '0';
+    
+    // Theme-specific colors
+    const bgBase = theme === 'dark' ? '#0a0b0d' : '#f9fafb';
+    const bgSecondary = theme === 'dark' ? '#121314' : '#ffffff';
+    const bgOverlay = theme === 'dark' ? 'rgba(237, 239, 242, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+    const textDefault = theme === 'dark' ? '#f5f9fe' : '#1f2937';
+    const textSecondary = theme === 'dark' ? '#a6aab5' : '#6b7280';
+    const borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.08)';
+    const messageBg = theme === 'dark' ? '#1a1b1e' : '#ffffff';
+    const inputBg = theme === 'dark' ? '#2d2e32' : '#f3f4f6';
+    const inputBorder = theme === 'dark' ? '#3f4045' : '#d1d5db';
+    const userMessageText = theme === 'dark' ? bgBase : '#ffffff';
     
     style.textContent = `
       .nexva-chat-container { position: fixed; ${position.includes('bottom') ? 'bottom: 20px;' : 'top: 20px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} z-index: 999999; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-      .nexva-chat-button { width: ${buttonSize}; height: ${buttonSize}; background: linear-gradient(135deg, ${buttonColor} 0%, ${hoverColor} 100%); border: none; border-radius: ${buttonBorderRadius}; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(50, 240, 140, 0.4); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-      .nexva-chat-button:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 30px rgba(50, 240, 140, 0.6); }
+      .nexva-chat-button { 
+        width: ${bubbleSize}; 
+        height: ${bubbleSize}; 
+        background: ${bubbleColor}; 
+        border: none; 
+        border-radius: ${bubbleBorderRadius}; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        cursor: pointer; 
+        box-shadow: ${bubbleShadow ? '0 4px 20px rgba(0, 0, 0, 0.2)' : 'none'}; 
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        ${bubbleAnimation === 'pulse' ? 'animation: subtlePulse 2s infinite;' : ''}
+        ${bubbleAnimation === 'bounce' ? 'animation: bounce 2s infinite;' : ''}
+      }
+      .nexva-chat-button:hover { transform: translateY(-2px) scale(1.05); box-shadow: ${bubbleShadow ? '0 8px 30px rgba(0, 0, 0, 0.3)' : 'none'}; }
       .nexva-chat-button svg { transition: transform 0.3s ease; }
-      .nexva-chat-button:hover svg { transform: rotate(-10deg) scale(1.1); }
+      .nexva-chat-button:hover svg { transform: ${bubbleAnimation === 'shake' ? 'rotate(-10deg)' : 'scale(1.1)'}; }
+      .nexva-chat-button img { width: 60%; height: 60%; object-fit: contain; }
       .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: 400px; height: 650px; max-height: calc(100vh - 120px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 1px solid ${borderColor}; }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }
       .nexva-chat-window.docked { width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; right: 0; left: auto; border-right: none; border-top: none; border-bottom: none; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15); animation: slideInRight 0.3s ease; }
       @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
-      .nexva-chat-header { background: ${bgSecondary}; color: ${textDefault}; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid ${borderColor}; min-height: 44px; }
-      .nexva-chat-header-title { display: flex; align-items: center; gap: 8px; overflow: hidden; flex: 1; }
+      .nexva-chat-header { background: ${bgSecondary}; color: ${textDefault}; border-bottom: 1px solid ${borderColor}; flex-shrink: 0; }
+      .nexva-chat-header-top { padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; min-height: 44px; gap: 12px; }
+      .nexva-chat-header-title { display: flex; align-items: center; gap: 8px; overflow: hidden; }
       .nexva-chat-header-title svg { flex-shrink: 0; width: 18px; height: 18px; opacity: 0.8; }
       .nexva-chat-header h3 { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0.3px; white-space: nowrap; }
       .nexva-chat-header-actions { display: flex; gap: 0; align-items: center; margin-right: -4px; }
+      .nexva-chat-controls-row { 
+        display: flex; 
+        background: ${bgBase}; 
+        border-bottom: 1px solid ${borderColor};
+        flex-shrink: 0;
+      }
+      .nexva-mode-switcher-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        background: ${bgOverlay};
+        border-left: 1px solid ${borderColor};
+      }
+      .nexva-mode-input-wrapper { 
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+      }
+      .nexva-mode-icon {
+        width: 18px;
+        height: 18px;
+        color: ${primaryColor};
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+      .nexva-mode-icon:hover { 
+        transform: scale(1.1);
+        color: ${hoverColor};
+      }
+      .nexva-mode-input { 
+        flex: 1;
+        height: 24px;
+        background: ${bgBase};
+        border: 1px solid ${borderColor};
+        border-radius: 0;
+        color: ${textDefault};
+        font-size: 11px;
+        font-weight: 500;
+        padding: 0 6px;
+        cursor: default;
+        outline: none;
+        pointer-events: none;
+      }
       .nexva-chat-icon-btn { background: transparent; border: none; color: ${textSecondary}; cursor: pointer; padding: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; opacity: 0.7; }
       .nexva-chat-icon-btn:hover { color: ${textDefault}; opacity: 1; background: rgba(255, 255, 255, 0.03); }
       .nexva-chat-icon-btn svg { width: 15px; height: 15px; }
       .nexva-chat-close:hover { color: #ef4444; background: rgba(239, 68, 68, 0.08); }
-      .nexva-chat-tabs { display: flex; background: ${bgBase}; }
+      .nexva-chat-tabs { 
+        display: flex; 
+        flex: 1;
+      }
       .nexva-chat-tab { flex: 1; padding: 12px 16px; text-align: center; cursor: pointer; border: none; background: ${bgOverlay}; font-size: 13px; font-weight: 500; color: ${textSecondary}; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
       .nexva-chat-tab:hover { background: ${bgSecondary}; }
-      .nexva-chat-tab.active { background: ${primaryColor}; color: ${bgBase}; }
+      .nexva-chat-tab.active { background: ${primaryColor}; color: ${userMessageText}; }
       .nexva-chat-tab svg { width: 18px; height: 18px; }
-      .nexva-chat-messages { flex: 1; overflow-y: auto; padding: 20px; background: ${bgBase}; }
+      .nexva-chat-messages { 
+        flex: 1; 
+        overflow-y: auto; 
+        padding: 20px; 
+        background: ${bgBase}; 
+        min-height: 0;
+      }
+      .nexva-preset-questions { 
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+        padding-bottom: 8px;
+      }
+      .nexva-preset-question-btn {
+        background: ${bgSecondary};
+        color: ${textDefault};
+        border: 1px solid ${borderColor};
+        padding: 10px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .nexva-preset-question-btn:hover {
+        background: ${primaryColor};
+        color: ${userMessageText};
+        border-color: ${primaryColor};
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
       .nexva-chat-message { margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; }
       .nexva-chat-message.user { flex-direction: row-reverse; }
       .nexva-chat-message-content { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; word-wrap: break-word; }
-      .nexva-chat-message.assistant .nexva-chat-message-content { background: ${bgSecondary}; color: ${textDefault}; border-radius: 12px 12px 12px 4px; }
-      .nexva-chat-message.user .nexva-chat-message-content { background: ${primaryColor}; color: ${bgBase}; border-radius: 12px 12px 4px 12px; font-weight: 500; }
+      .nexva-chat-message.assistant .nexva-chat-message-content { background: ${messageBg}; color: ${textDefault}; border-radius: 12px 12px 12px 4px; ${theme === 'light' ? 'border: 1px solid ' + borderColor + ';' : ''} }
+      .nexva-chat-message.user .nexva-chat-message-content { background: ${primaryColor}; color: ${userMessageText}; border-radius: 12px 12px 4px 12px; font-weight: 500; }
       .nexva-chat-message.system .nexva-chat-message-content { background: ${bgOverlay}; color: ${textSecondary}; text-align: center; max-width: 100%; font-size: 13px; }
       .nexva-chat-message.human { align-items: flex-start; }
       .nexva-human-avatar { width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); display: flex; align-items: center; justify-content: center; color: white; }
       .nexva-human-avatar svg { width: 18px; height: 18px; }
       .nexva-human-message-wrapper { flex: 1; max-width: calc(100% - 42px); }
       .nexva-human-name { font-size: 12px; font-weight: 600; color: #7c3aed; margin-bottom: 4px; text-transform: capitalize; }
-      .nexva-chat-message.human .nexva-chat-message-content { background: ${bgSecondary}; color: ${textDefault}; border-radius: 12px 12px 12px 4px; border: 1px solid rgba(124, 58, 237, 0.2); max-width: 100%; }
+      .nexva-chat-message.human .nexva-chat-message-content { background: ${bgSecondary}; color: ${textDefault}; border-radius: 12px 12px 12px 4px; border: 1px solid rgba(124, 58, 237, 0.2); max-width: 100%; ${theme === 'light' ? 'box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);' : ''} }
       .nexva-load-more-indicator { text-align: center; padding: 12px; font-size: 12px; color: ${textSecondary}; background: ${bgOverlay}; border-radius: 8px; margin-bottom: 12px; }
       @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       .nexva-p { margin: 8px 0; line-height: 1.6; }
@@ -71,94 +180,29 @@ export const Styles = {
       .nexva-code-block { margin: 12px 0; border-radius: 8px; overflow: hidden; background: ${bgBase}; border: 1px solid ${borderColor}; }
       .nexva-code-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: ${bgOverlay}; border-bottom: 1px solid ${borderColor}; }
       .nexva-code-lang { font-size: 12px; color: ${textSecondary}; text-transform: uppercase; font-weight: 500; }
-      .nexva-code-copy { padding: 4px 12px; background: ${primaryColor}; color: ${bgBase}; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+      .nexva-code-copy { padding: 4px 12px; background: ${primaryColor}; color: ${userMessageText}; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
       .nexva-code-copy:hover { background: ${hoverColor}; }
       .nexva-code-pre { margin: 0; padding: 12px; overflow-x: auto; }
       .nexva-code-content { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5; color: ${textDefault}; }
-      .nexva-chat-input-area { padding: 16px 20px; background: ${bgSecondary}; border-top: 1px solid ${borderColor}; }
-      .nexva-mode-switcher { display: flex; gap: 0; background: ${bgOverlay}; border: 1px solid ${borderColor}; overflow: hidden; margin-bottom: 12px; }
-      .nexva-mode-btn { 
-        flex: 1;
-        background: transparent; 
-        border: none; 
-        padding: 8px 16px; 
-        cursor: pointer; 
-        transition: all 0.2s ease; 
-        opacity: 0.6; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        gap: 6px;
-        font-size: 12px;
-        color: ${textSecondary};
-        font-weight: 500;
-        position: relative;
-        border-right: 1px solid ${borderColor};
-      }
-      .nexva-mode-btn:last-child { border-right: none; }
-      .nexva-mode-btn svg { width: 16px; height: 16px; }
-      .nexva-mode-btn:hover { 
-        opacity: 1; 
+      .nexva-chat-input-area { 
+        padding: 16px 20px; 
         background: ${bgSecondary}; 
-        color: ${textDefault};
-      }
-      .nexva-mode-btn.active { 
-        opacity: 1; 
-        background: ${primaryColor}; 
-        color: ${bgBase};
-      }
-      .nexva-mode-btn::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        top: -36px;
-        left: 50%;
-        transform: translateX(-50%) scale(0.9);
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 500;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 0;
-        transition: all 0.2s ease;
-        z-index: 1000;
-      }
-      .nexva-mode-btn::before {
-        content: '';
-        position: absolute;
-        top: -32px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 0;
-        height: 0;
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 5px solid rgba(0, 0, 0, 0.9);
-        pointer-events: none;
-        opacity: 0;
-        transition: all 0.2s ease;
-        z-index: 1000;
-      }
-      .nexva-mode-btn:hover::after,
-      .nexva-mode-btn:hover::before {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
+        border-top: 1px solid ${borderColor}; 
+        flex-shrink: 0;
       }
       .nexva-chat-actions { display: flex; gap: 8px; margin-bottom: 12px; }
       .nexva-chat-action-btn { flex: 1; padding: 10px 14px; border: 1px solid ${primaryColor}; background: transparent; color: ${primaryColor}; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-      .nexva-chat-action-btn:hover { background: ${primaryColor}; color: ${bgBase}; }
+      .nexva-chat-action-btn:hover { background: ${primaryColor}; color: ${userMessageText}; }
       .nexva-chat-action-btn svg { width: 16px; height: 16px; fill: currentColor; }
       .nexva-chat-input-row { display: flex; gap: 8px; align-items: center; }
       .nexva-chat-voice-prompt { width: 40px; height: 40px; min-width: 40px; border: none; border-radius: 8px; background: ${bgOverlay}; color: ${textSecondary}; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
       .nexva-chat-voice-prompt:hover { background: ${bgSecondary}; color: ${textDefault}; }
       .nexva-chat-voice-prompt.recording { background: ${primaryColor}; color: white; }
       .nexva-chat-voice-prompt svg { width: 18px; height: 18px; }
-      .nexva-chat-input { flex: 1; padding: 12px 16px; border: none; border-radius: 8px; font-size: 14px; outline: none; background: ${bgOverlay}; color: ${textDefault}; transition: all 0.2s; }
-      .nexva-chat-input:focus { background: ${bgSecondary}; box-shadow: 0 0 0 1px ${primaryColor}; }
+      .nexva-chat-input { flex: 1; padding: 12px 16px; border: none; border-radius: 8px; font-size: 14px; outline: none; background: ${inputBg}; color: ${textDefault}; transition: all 0.2s; ${theme === 'light' ? 'border: 1px solid ' + inputBorder + ';' : ''} }
+      .nexva-chat-input:focus { background: ${theme === 'dark' ? bgSecondary : '#ffffff'}; box-shadow: 0 0 0 ${theme === 'light' ? '2px' : '1px'} ${primaryColor}; }
       .nexva-chat-input::placeholder { color: ${textSecondary}; }
-      .nexva-chat-btn { width: 44px; height: 44px; min-width: 44px; border: none; border-radius: 50%; background: ${primaryColor}; color: ${bgBase}; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+      .nexva-chat-btn { width: 44px; height: 44px; min-width: 44px; border: none; border-radius: 50%; background: ${primaryColor}; color: ${userMessageText}; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
       .nexva-chat-btn:hover { background: ${hoverColor}; transform: scale(1.05); }
       .nexva-chat-btn:disabled { background: ${bgOverlay}; color: ${textSecondary}; cursor: not-allowed; transform: none; }
       .nexva-chat-btn svg { width: 20px; height: 20px; fill: currentColor; }
@@ -178,8 +222,13 @@ export const Styles = {
       .nexva-chat-voice-wave span:nth-child(4) { animation-delay: 0.3s; }
       @keyframes wave { 0%, 100% { height: 18px; } 50% { height: 8px; } }
       @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-      @keyframes subtlePulse { 0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); } 50% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); } 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); } }
-      @media (max-width: 480px) { .nexva-chat-window { width: calc(100vw - 40px); height: calc(100vh - 120px); } }
+      @keyframes subtlePulse { 0% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); } 50% { box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3); } 100% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); } }
+      @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+      @media (max-width: 480px) { 
+        .nexva-chat-window { width: calc(100vw - 40px); height: calc(100vh - 120px); } 
+        .nexva-mode-switcher-container { display: none; }
+        .nexva-chat-tabs { flex: 1; }
+      }
       .nexva-chat-messages::-webkit-scrollbar { width: 6px; }
       .nexva-chat-messages::-webkit-scrollbar-track { background: transparent; }
       .nexva-chat-messages::-webkit-scrollbar-thumb { background: ${borderColor}; border-radius: 3px; }

@@ -103,8 +103,31 @@ export const NexvaChat = {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
     
-    document.querySelectorAll('.nexva-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => this.switchMode(btn.dataset.mode));
+    const modeIcon = document.getElementById('nexvaModeIcon');
+    if (modeIcon && this.config.enableHumanSupport) {
+      modeIcon.addEventListener('click', () => {
+        const newMode = this.currentMode === 'ai' ? 'human' : 'ai';
+        this.switchMode(newMode);
+      });
+    }
+    
+    // Preset questions click handlers
+    document.querySelectorAll('.nexva-preset-question-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const question = btn.dataset.question;
+        if (question) {
+          const input = document.getElementById('nexvaChatInput');
+          if (input) {
+            input.value = question;
+            this.sendMessage();
+          }
+          // Hide preset questions after first use
+          const presetContainer = document.getElementById('nexvaPresetQuestions');
+          if (presetContainer) {
+            presetContainer.style.display = 'none';
+          }
+        }
+      });
     });
     
     console.log('[Nexva] Event listeners attached successfully');
@@ -312,13 +335,23 @@ export const NexvaChat = {
   switchMode: function(mode) {
     console.log('[Nexva] switchMode called, mode:', mode, 'conversationId:', this.conversationId);
     
-    if (!this.conversationId) {
-      Messaging.addMessage('system', 'Let\'s start a conversation first');
+    // Check if human support is enabled
+    if (!this.config.enableHumanSupport) {
+      console.log('[Nexva] Human support is disabled in config');
       return;
     }
     
     if (mode === this.currentMode) {
       console.log('[Nexva] Already in mode:', mode);
+      return;
+    }
+    
+    // If no conversation yet, just update the UI
+    if (!this.conversationId) {
+      this.currentMode = mode;
+      UI.updateMode(mode);
+      const modeText = mode === 'ai' ? 'AI Assistant' : 'Human Support';
+      console.log('[Nexva] Mode set to:', modeText, '(conversation not started yet)');
       return;
     }
     
