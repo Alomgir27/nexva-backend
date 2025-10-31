@@ -16,28 +16,43 @@ find . -name '*.pyc' -delete 2>/dev/null || true
 echo "🔪 Checking port $PORT..."
 apt-get install -y lsof psmisc >/dev/null 2>&1 || true
 
+# Kill any existing nexva backend processes
+pkill -9 -f "/workspace/nexva-backend.*uvicorn" 2>/dev/null || true
+pkill -9 -f "uvicorn main:app.*$PORT" 2>/dev/null || true
+
+# Force kill anything on the port
 PORT_INFO=$(ss -tulpn 2>/dev/null | grep ":$PORT " || true)
 if [ -n "$PORT_INFO" ]; then
     PID=$(echo "$PORT_INFO" | grep -oP 'pid=\K[0-9]+' | head -1)
     if [ -n "$PID" ]; then
         CMD=$(ps -p $PID -o cmd= 2>/dev/null || echo "unknown")
-        echo "   Found process on port $PORT (PID: $PID)"
-        echo "   Process: $CMD"
-        echo "   Killing process to free port..."
+        echo "   Found process on port $PORT (PID: $PID): $CMD"
+        echo "   Killing..."
         kill -9 $PID 2>/dev/null || true
-        sleep 2
-        echo "   ✅ Port $PORT freed"
-    else
-        echo "   Warning: Port $PORT in use but PID not found, force killing..."
-        fuser -k $PORT/tcp 2>/dev/null || true
+    fi
+    
+    # Force kill using fuser as backup
+    fuser -k $PORT/tcp 2>/dev/null || true
+    sleep 3
+    
+    # Verify port is free
+    if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
+        echo "   ⚠️  Port $PORT still in use, retrying..."
+        lsof -ti:$PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
+        fuser -9 -k $PORT/tcp 2>/dev/null || true
         sleep 2
     fi
-else
-    echo "   ✅ Port $PORT is available"
 fi
 
-pkill -f "/workspace/nexva-backend.*uvicorn" 2>/dev/null || true
-sleep 1
+# Final check
+if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
+    echo "   ❌ Unable to free port $PORT"
+    echo "   Active connections:"
+    ss -tulpn | grep ":$PORT "
+    exit 1
+else
+    echo "   ✅ Port $PORT is ready"
+fi
 
 echo ""
 echo "📦 Installing PostgreSQL..."
@@ -141,10 +156,10 @@ if [ -f "requirements.txt" ]; then
     echo "   ✅ Dependencies installed"
 fi
 
-echo ""
-echo "🤖 Loading ML Models..."
-python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" 2>/dev/null && echo "   ✅ Whisper ready" || echo "   ⚠️  Will load on first use"
-python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" 2>/dev/null && echo "   ✅ Embeddings ready" || echo "   ⚠️  Will load on first use"
+# echo ""
+# echo "🤖 Loading ML Models..."
+# python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" 2>/dev/null && echo "   ✅ Whisper ready" || echo "   ⚠️  Will load on first use"
+# python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" 2>/dev/null && echo "   ✅ Embeddings ready" || echo "   ⚠️  Will load on first use"
 
 echo ""
 echo "🗄️  Initializing database..."
@@ -167,17 +182,30 @@ source venv/bin/activate
 nohup uvicorn main:app --reload --host 0.0.0.0 --port $PORT > nohup.out 2>&1 &
 BACKEND_PID=$!
 
-sleep 3
+echo "   Waiting for backend to start..."
+sleep 5
 
-if ps -p $BACKEND_PID > /dev/null 2>&1; then
+if curl -s http://localhost:$PORT/docs > /dev/null 2>&1; then
     echo "✅ Backend started successfully (PID: $BACKEND_PID)"
     echo ""
     echo "🌐 Access your API:"
     echo "   Local: http://localhost:$PORT"
-    echo "   RunPod: Check your RunPod dashboard for proxy URL"
+    echo "   Docs: http://localhost:$PORT/docs"
+    echo "   RunPod: https://yueihds3xl383a-$PORT.proxy.runpod.net/docs"
     echo ""
+    echo "📋 Management:"
+    echo "   • View logs: tail -f nohup.out"
+    echo "   • Stop: pkill -f 'uvicorn main:app'"
+    echo ""
+elif ps -p $BACKEND_PID > /dev/null 2>&1; then
+    echo "⚠️  Backend process running but not responding yet"
+    echo "   Wait a few seconds and check: curl http://localhost:$PORT"
+    echo "   Or check logs: tail -f nohup.out"
 else
-    echo "❌ Backend failed to start. Check logs: cat nohup.out"
+    echo "❌ Backend failed to start"
+    echo ""
+    echo "Recent logs:"
+    tail -20 nohup.out
     exit 1
 fi
 
