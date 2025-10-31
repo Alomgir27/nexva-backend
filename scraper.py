@@ -41,14 +41,15 @@ class WebScraper:
             options.add_argument('--disable-logging')
             options.add_argument('--log-level=3')
             options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-            options.page_load_strategy = 'eager'
+            options.page_load_strategy = 'normal'
             
             print(f"📦 Installing ChromeDriver...")
             service = Service(ChromeDriverManager().install())
             
             print(f"🚀 Starting Chrome browser...")
             self.driver = webdriver.Chrome(service=service, options=options)
-            self.driver.set_page_load_timeout(20)
+            self.driver.set_page_load_timeout(15)
+            self.driver.set_script_timeout(10)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             print(f"✅ Chrome WebDriver ready")
             return self.driver
@@ -341,6 +342,7 @@ class WebScraper:
         scraped_pages = []
         pages_batch = []
         base_domain = urlparse(start_url).netloc
+        pages_since_driver_refresh = 0
         
         domain = db.query(models.Domain).filter(models.Domain.id == domain_id).first()
         chatbot_id = domain.chatbot_id
@@ -373,8 +375,17 @@ class WebScraper:
                 self.visited.add(normalized_url)
                 
                 try:
-                    driver.get(url)
-                    time.sleep(1)
+                    try:
+                        driver.get(url)
+                        time.sleep(1)
+                    except Exception as load_error:
+                        if 'timeout' in str(load_error).lower() and 'renderer' in str(load_error).lower():
+                            print(f"⚠️ Renderer timeout on {url}, restarting driver...")
+                            self._cleanup_driver()
+                            driver = self._get_driver()
+                            consecutive_failures += 1
+                            continue
+                        raise
                     
                     try:
                         driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
@@ -451,7 +462,14 @@ class WebScraper:
                         db.commit()
                         
                         consecutive_failures = 0
+                        pages_since_driver_refresh += 1
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
+                        
+                        if pages_since_driver_refresh >= 20:
+                            print(f"🔄 Refreshing driver after 20 pages...")
+                            self._cleanup_driver()
+                            driver = self._get_driver()
+                            pages_since_driver_refresh = 0
                         
                         if len(pages_batch) >= 5:
                             self._batch_index_pages(pages_batch, chatbot_id, domain_id)
