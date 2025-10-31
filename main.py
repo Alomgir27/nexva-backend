@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks,
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, Dict, List
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -105,6 +105,7 @@ class ScrapedPageResponse(BaseModel):
     last_updated: datetime
 
 class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     domain_id: int
     filename: str
