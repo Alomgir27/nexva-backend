@@ -156,8 +156,8 @@ echo "🤖 Loading ML Models..."
 echo ""
 echo "🗄️  Initializing database..."
 # COMMENTED OUT - Preserves existing data
-# su - postgres -c "psql -c \"DROP DATABASE IF EXISTS products_db;\"" 2>/dev/null || true
-# su - postgres -c "psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
+su - postgres -c "psql -c \"DROP DATABASE IF EXISTS products_db;\"" 2>/dev/null || true
+su - postgres -c "psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
 python3 -c "import models; models.init_db()" && echo "   ✅ Database initialized (data preserved)"
 
 echo ""
