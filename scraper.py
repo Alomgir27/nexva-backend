@@ -320,6 +320,17 @@ class WebScraper:
                     driver.get(url)
                     time.sleep(2)
                     
+                    # Scroll to trigger lazy-loaded content (videos, iframes)
+                    try:
+                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+                        time.sleep(1)
+                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                        time.sleep(1)
+                        driver.execute_script("window.scrollTo(0, 0);")
+                        time.sleep(1)
+                    except:
+                        pass
+                    
                     # Check if blocked by anti-bot (more specific detection)
                     page_title = driver.title.lower()
                     page_source_sample = driver.page_source.lower()[:2000]
@@ -349,6 +360,8 @@ class WebScraper:
                     
                     # Extract media URLs
                     media_files = self._extract_media_urls(soup, url)
+                    if media_files:
+                        print(f"🎬 Found {len(media_files)} media file(s) on {url}")
                     media_urls = [m['url'] for m in media_files]
                     media_transcriptions = []
                     

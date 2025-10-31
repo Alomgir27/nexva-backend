@@ -453,7 +453,7 @@ def list_documents(
     total = db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).count()
     
     return {
-        "documents": documents,
+        "documents": [DocumentResponse.model_validate(doc) for doc in documents],
         "page": page,
         "per_page": per_page,
         "total": total,
