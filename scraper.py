@@ -239,8 +239,41 @@ class WebScraper:
                     print(f"⚠️ Could not find audio file for {media_url}")
                     return None
                 
-                # Transcribe the audio
-                transcription = transcribe_audio_file(temp_audio, language=None)
+                # Get audio duration
+                audio = AudioSegment.from_file(temp_audio)
+                duration_seconds = len(audio) / 1000.0
+                
+                # Transcribe in chunks if longer than 3 minutes
+                chunk_duration = 180000  # 3 minutes in milliseconds
+                transcriptions = []
+                
+                if duration_seconds > 180:  # Longer than 3 minutes
+                    print(f"📊 Audio is {duration_seconds:.1f}s, splitting into chunks...")
+                    num_chunks = int(duration_seconds / 180) + 1
+                    
+                    for i in range(num_chunks):
+                        start_ms = i * chunk_duration
+                        end_ms = min((i + 1) * chunk_duration, len(audio))
+                        
+                        chunk = audio[start_ms:end_ms]
+                        chunk_file = os.path.join(tempfile.gettempdir(), f"{video_id}_chunk_{i}.wav")
+                        
+                        try:
+                            chunk.export(chunk_file, format="wav")
+                            chunk_text = transcribe_audio_file(chunk_file, language=None)
+                            if chunk_text:
+                                transcriptions.append(chunk_text)
+                                print(f"✅ Chunk {i+1}/{num_chunks} transcribed")
+                        except Exception as chunk_error:
+                            print(f"⚠️ Chunk {i+1} failed: {chunk_error}")
+                        finally:
+                            if os.path.exists(chunk_file):
+                                os.unlink(chunk_file)
+                    
+                    transcription = " ".join(transcriptions)
+                else:
+                    # Short audio, transcribe directly
+                    transcription = transcribe_audio_file(temp_audio, language=None)
                 
                 if transcription:
                     return {
@@ -466,7 +499,17 @@ class WebScraper:
                     continue
         
         finally:
-            driver.quit()
+            try:
+                driver.quit()
+            except:
+                pass
+            
+            # Force cleanup Chrome processes
+            try:
+                import subprocess
+                subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
+            except:
+                pass
         
         return scraped_pages
 

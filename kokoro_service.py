@@ -3,6 +3,7 @@ from typing import Optional
 from kokoro import KPipeline
 import soundfile as sf
 from io import BytesIO
+import torch
 
 _model_instance = None
 
@@ -11,20 +12,35 @@ class KokoroService:
         global _model_instance
         if _model_instance is not None:
             self.pipeline = _model_instance
-            print("✅ Using cached Kokoro model")
+            self.device = self.pipeline.device if hasattr(self.pipeline, 'device') else 'cpu'
+            print(f"✅ Using cached Kokoro model on {self.device}")
         else:
             self.pipeline = None
+            self.device = 'cpu'
             self._initialize_model()
     
     def _initialize_model(self):
         global _model_instance
+        
+        if torch.cuda.is_available():
+            try:
+                self.device = 'cuda'
+                print(f"🚀 Loading Kokoro-82M on GPU...")
+                self.pipeline = KPipeline(lang_code='a', device='cuda')
+                _model_instance = self.pipeline
+                print(f"✅ Kokoro-82M loaded on GPU (82M params)")
+                return
+            except Exception as e:
+                print(f"⚠️ GPU loading failed, falling back to CPU: {e}")
+        
         try:
-            print("🚀 Loading Kokoro-82M model (ultra-fast)...")
-            self.pipeline = KPipeline(lang_code='a')
+            self.device = 'cpu'
+            print(f"🚀 Loading Kokoro-82M on CPU...")
+            self.pipeline = KPipeline(lang_code='a', device='cpu')
             _model_instance = self.pipeline
-            print("✅ Kokoro-82M loaded and cached (82M params, Apache licensed)")
+            print(f"✅ Kokoro-82M loaded on CPU (82M params)")
         except Exception as e:
-            print(f"⚠️ Kokoro initialization failed: {e}")
+            print(f"❌ Kokoro initialization failed: {e}")
             self.pipeline = None
     
     async def generate_speech_async(
