@@ -36,51 +36,39 @@ def send_support_invite(email: str, name: str, chatbot_name: str, invited_by: st
     FRONTEND_URL = "https://nexva.pages.dev"
     accept_url = f"{FRONTEND_URL}/accept-invitation?token={invitation_token}"
     
-    subject = f"You've been invited to support team for {chatbot_name}"
+    subject = f"Support Team Invitation - {chatbot_name}"
     body = f"""Hello {name},
 
 {invited_by} has invited you to join the support team for {chatbot_name}.
 
-Click the link below to accept the invitation:
-{accept_url}
+Accept invitation: {accept_url}
 
-This invitation will expire in 7 days.
+This link expires in 7 days.
 
-Best regards,
-Nexva Team"""
+- Nexva Team"""
 
     html_body = f"""
     <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-                <h1 style="color: white; margin: 0;">Nexva</h1>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="border-bottom: 2px solid #0fdc78; padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #111;">Support Team Invitation</h2>
             </div>
-            <div style="padding: 30px; background-color: #f9fafb;">
-                <h2 style="color: #111827;">Support Team Invitation</h2>
-                <p style="color: #4b5563; font-size: 16px;">Hello <strong>{name}</strong>,</p>
-                <p style="color: #4b5563; font-size: 16px;">
-                    <strong>{invited_by}</strong> has invited you to join the support team for 
-                    <strong style="color: #667eea;">{chatbot_name}</strong>.
-                </p>
-                <p style="color: #4b5563; font-size: 16px;">
-                    As a support team member, you'll be able to respond to customer support tickets through the Nexva dashboard.
-                </p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{accept_url}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">Accept Invitation</a>
-                </div>
-                <p style="color: #6b7280; font-size: 14px;">
-                    Or copy and paste this link into your browser:<br>
-                    <a href="{accept_url}" style="color: #667eea; word-break: break-all;">{accept_url}</a>
-                </p>
-                <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
-                    This invitation will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
-                </p>
-            </div>
-            <div style="background-color: #f3f4f6; padding: 20px; text-align: center;">
-                <p style="color: #6b7280; font-size: 12px; margin: 0;">
-                    © 2025 Nexva. All rights reserved.
-                </p>
-            </div>
+            
+            <p>Hello <strong>{name}</strong>,</p>
+            
+            <p><strong>{invited_by}</strong> invited you to join the support team for <strong>{chatbot_name}</strong>.</p>
+            
+            <p style="margin: 30px 0;">
+                <a href="{accept_url}" style="background-color: #0fdc78; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">Accept Invitation</a>
+            </p>
+            
+            <p style="color: #666; font-size: 14px;">
+                Link: <a href="{accept_url}" style="color: #0fdc78;">{accept_url}</a>
+            </p>
+            
+            <p style="color: #999; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
+                This invitation expires in 7 days. If you didn't expect this, ignore this email.
+            </p>
         </body>
     </html>
     """
@@ -90,7 +78,7 @@ def send_new_ticket_alert(support_emails: List[str], ticket_id: int, chatbot_nam
     FRONTEND_URL = "https://nexva.pages.dev"
     ticket_url = f"{FRONTEND_URL}/dashboard/support"
     
-    subject = f"New Support Ticket #{ticket_id} - {chatbot_name}"
+    subject = f"New Ticket #{ticket_id} - {chatbot_name}"
     preview = user_message[:100] + "..." if len(user_message) > 100 else user_message
     
     body = f"""New Support Ticket #{ticket_id}
@@ -98,20 +86,26 @@ def send_new_ticket_alert(support_emails: List[str], ticket_id: int, chatbot_nam
 Chatbot: {chatbot_name}
 Message: {preview}
 
-View and respond: {ticket_url}
+View: {ticket_url}
 
-Nexva Team"""
+- Nexva Team"""
 
     html_body = f"""
     <html>
-        <body style="font-family: Arial, sans-serif;">
-            <h2>New Support Ticket #{ticket_id}</h2>
-            <p><strong>Chatbot:</strong> {chatbot_name}</p>
-            <div style="background-color: #f5f5f5; padding: 15px; border-left: 4px solid #4F46E5; margin: 20px 0;">
-                <p style="margin: 0;">{preview}</p>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="border-bottom: 2px solid #0fdc78; padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #111;">New Support Ticket #{ticket_id}</h2>
             </div>
-            <p><a href="{ticket_url}" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Ticket</a></p>
-            <p>Best regards,<br>Nexva Team</p>
+            
+            <p><strong>Chatbot:</strong> {chatbot_name}</p>
+            
+            <div style="background-color: #f5f5f5; padding: 15px; border-left: 3px solid #0fdc78; margin: 20px 0;">
+                <p style="margin: 0; color: #555;">{preview}</p>
+            </div>
+            
+            <p style="margin: 30px 0;">
+                <a href="{ticket_url}" style="background-color: #0fdc78; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">View Ticket</a>
+            </p>
         </body>
     </html>
     """
