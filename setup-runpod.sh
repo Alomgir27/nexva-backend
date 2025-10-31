@@ -167,13 +167,13 @@ echo ""
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
 echo ""
-echo "📝 Server running in background..."
+echo "📝 Server running with 2 workers..."
 echo "   • View logs: tail -f nohup.out"
 echo "   • Stop server: pkill -f 'uvicorn main:app'"
 echo ""
 
 source venv/bin/activate
-nohup uvicorn main:app --reload --host 0.0.0.0 --port $PORT > nohup.out 2>&1 &
+nohup uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."

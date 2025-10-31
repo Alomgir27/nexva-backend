@@ -29,6 +29,9 @@ from neural_tts_service import neural_tts
 async def lifespan(app: FastAPI):
     models.init_db()
     search.init_elasticsearch()
+    print("🚀 Preloading all models...")
+    search.get_embedding_model()
+    print("✅ All models loaded and ready")
     yield
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)
