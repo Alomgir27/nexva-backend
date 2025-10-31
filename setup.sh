@@ -23,18 +23,18 @@ pkill -f "ollama serve" 2>/dev/null || true
 sleep 2
 
 echo "🐳 Checking Docker services..."
-if ! docker ps &>/dev/null; then
-    echo "   ❌ Docker not running. Please start Docker."
-    exit 1
-fi
-
-if ! docker ps | grep -q "learning_postgres\|learning_elasticsearch"; then
-    echo "   Starting Docker containers..."
-    docker-compose up -d
-    echo "   Waiting for services to initialize..."
-    sleep 20
+if docker ps &>/dev/null; then
+    if ! docker ps | grep -q "learning_postgres\|learning_elasticsearch"; then
+        echo "   Starting Docker containers..."
+        docker-compose up -d
+        echo "   Waiting for services to initialize..."
+        sleep 20
+    else
+        echo "   ✅ Docker containers running"
+    fi
 else
-    echo "   ✅ Docker containers running"
+    echo "   ⚠️  Docker not accessible (running inside container?)"
+    echo "   Assuming services are running on host..."
 fi
 
 echo ""
