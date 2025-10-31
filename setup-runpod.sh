@@ -55,8 +55,8 @@ service postgresql restart || service postgresql start || true
 sleep 3
 
 # Idempotent user/database creation
-# su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='admin'\" | grep -q 1 || psql -c \"CREATE USER admin WITH PASSWORD 'admin123' SUPERUSER;\"" 2>/dev/null || true
-# su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='products_db'\" | grep -q 1 || psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
+su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='admin'\" | grep -q 1 || psql -c \"CREATE USER admin WITH PASSWORD 'admin123' SUPERUSER;\"" 2>/dev/null || true
+su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='products_db'\" | grep -q 1 || psql -c \"CREATE DATABASE products_db OWNER admin;\"" 2>/dev/null || true
 echo "   ✅ PostgreSQL ready"
 
 echo ""
@@ -167,13 +167,13 @@ echo ""
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
 echo ""
-echo "📝 Server running with 2 workers..."
+echo "📝 Server running with 1 worker (prevents memory exhaustion)..."
 echo "   • View logs: tail -f nohup.out"
 echo "   • Stop server: pkill -f 'uvicorn main:app'"
 echo ""
 
 source venv/bin/activate
-nohup uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 > nohup.out 2>&1 &
+nohup uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 75 --limit-concurrency 100 > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."
