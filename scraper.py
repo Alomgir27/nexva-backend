@@ -12,6 +12,7 @@ import models
 import tempfile
 import os
 import re
+import gc
 from pydub import AudioSegment
 from transcription_service import transcribe_audio_file
 import yt_dlp
@@ -22,8 +23,12 @@ class WebScraper:
         self.visited = set()
         self.failed_attempts = {}
         self.max_retries = 3
+        self.driver = None
         
     def _get_driver(self):
+        if self.driver:
+            return self.driver
+        
         print(f"🔧 Initializing Chrome WebDriver...")
         try:
             options = Options()
@@ -32,21 +37,39 @@ class WebScraper:
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
             options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-logging')
+            options.add_argument('--log-level=3')
             options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-            options.page_load_strategy = 'normal'
+            options.page_load_strategy = 'eager'
             
             print(f"📦 Installing ChromeDriver...")
             service = Service(ChromeDriverManager().install())
             
             print(f"🚀 Starting Chrome browser...")
-            driver = webdriver.Chrome(service=service, options=options)
-            driver.set_page_load_timeout(30)
-            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            self.driver = webdriver.Chrome(service=service, options=options)
+            self.driver.set_page_load_timeout(20)
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             print(f"✅ Chrome WebDriver ready")
-            return driver
+            return self.driver
         except Exception as e:
             print(f"❌ Failed to initialize Chrome WebDriver: {e}")
             raise
+    
+    def _cleanup_driver(self):
+        if self.driver:
+            try:
+                self.driver.quit()
+            except:
+                pass
+            finally:
+                self.driver = None
+                
+        try:
+            import subprocess
+            subprocess.run(['pkill', '-f', 'chrome'], capture_output=True, timeout=5)
+        except:
+            pass
     
     def _normalize_url(self, url: str) -> str:
         parsed = urlparse(url)
@@ -316,6 +339,7 @@ class WebScraper:
         driver = self._get_driver()
         to_visit = [start_url]
         scraped_pages = []
+        pages_batch = []
         base_domain = urlparse(start_url).netloc
         
         domain = db.query(models.Domain).filter(models.Domain.id == domain_id).first()
@@ -335,7 +359,6 @@ class WebScraper:
                     break
                 
                 if len(to_visit) > 1000:
-                    print(f"Too many URLs in queue ({len(to_visit)}), limiting to 1000")
                     to_visit = to_visit[:1000]
                 
                 url = to_visit.pop(0)
@@ -351,24 +374,19 @@ class WebScraper:
                 
                 try:
                     driver.get(url)
-                    time.sleep(2)
+                    time.sleep(1)
                     
-                    # Scroll to trigger lazy-loaded content (videos, iframes)
                     try:
                         driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-                        time.sleep(1)
-                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                        time.sleep(1)
+                        time.sleep(0.5)
                         driver.execute_script("window.scrollTo(0, 0);")
-                        time.sleep(1)
                     except:
                         pass
                     
-                    # Check if blocked by anti-bot (more specific detection)
+                    page_source = driver.page_source
                     page_title = driver.title.lower()
-                    page_source_sample = driver.page_source.lower()[:2000]
+                    page_source_sample = page_source.lower()[:2000]
                     
-                    # Only flag as blocked if we see clear blocking indicators
                     blocking_patterns = [
                         ('access denied', 'forbidden'),
                         ('cloudflare', 'checking your browser'),
@@ -388,29 +406,29 @@ class WebScraper:
                         self.failed_attempts[normalized_url] = self.max_retries
                         continue
                     
-                    soup = BeautifulSoup(driver.page_source, 'lxml')
+                    soup = BeautifulSoup(page_source, 'lxml')
                     content_data = self._extract_content(soup)
                     
-                    # Extract media URLs
                     media_files = self._extract_media_urls(soup, url)
                     if media_files:
                         print(f"🎬 Found {len(media_files)} media file(s) on {url}")
                     media_urls = [m['url'] for m in media_files]
                     media_transcriptions = []
                     
-                    # Process media files and transcribe
                     for media in media_files:
                         result = self._process_media_file(media['url'], media['type'])
                         if result:
                             media_transcriptions.append(result)
-                            # Append transcription to content
                             content_data['content'] += f"\n\n[{media['type'].upper()} TRANSCRIPTION from {result['url']}]: {result['transcription']}"
+                    
+                    links = soup.find_all('a', href=True)[:100]
+                    
+                    del soup, page_source
+                    gc.collect()
                     
                     if content_data['content']:
                         word_count = len(content_data['content'].split())
                         content_preview = content_data['content'][:200] + "..." if len(content_data['content']) > 200 else content_data['content']
-                        
-                        tags = search.generate_content_tags(content_data['title'], content_data['content'])
                         
                         scraped_page = models.ScrapedPage(
                             domain_id=domain_id,
@@ -421,75 +439,46 @@ class WebScraper:
                             word_count=word_count,
                             media_urls=media_urls,
                             media_transcriptions=media_transcriptions,
-                            tags=tags,
+                            tags=[],
                             last_updated=datetime.utcnow()
                         )
                         db.add(scraped_page)
                         db.commit()
                         scraped_pages.append(scraped_page)
+                        pages_batch.append((scraped_page, content_data, media_transcriptions))
                         
-                        # Update domain pages count in real-time
                         domain.pages_scraped = len(scraped_pages)
                         db.commit()
                         
                         consecutive_failures = 0
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
                         
-                        chunks = self._chunk_text(content_data['content'])
-                        tags = search.generate_content_tags(content_data['title'], content_data['content'])
+                        if len(pages_batch) >= 5:
+                            self._batch_index_pages(pages_batch, chatbot_id, domain_id)
+                            pages_batch.clear()
+                            gc.collect()
                         
-                        for idx, chunk in enumerate(chunks):
-                            doc = {
-                                'url': normalized_url,
-                                'title': content_data['title'],
-                                'content': chunk,
-                                'chunk_index': idx,
-                                'chatbot_id': chatbot_id,
-                                'domain_id': domain_id,
-                                'tags': tags
-                            }
-                            search.index_chatbot_content(chatbot_id, doc)
+                        unique_links = set()
                         
-                        # Index media transcriptions separately with metadata
-                        for media_trans in media_transcriptions:
-                            media_tags = search.generate_content_tags(
-                                f"{content_data['title']} - {media_trans['type']}", 
-                                media_trans['transcription']
-                            )
-                            media_doc = {
-                                'url': normalized_url,
-                                'title': f"{content_data['title']} - {media_trans['type'].upper()}",
-                                'content': media_trans['transcription'],
-                                'chunk_index': 0,
-                                'chatbot_id': chatbot_id,
-                                'domain_id': domain_id,
-                                'media_type': media_trans['type'],
-                                'media_url': media_trans['url'],
-                                'tags': media_tags
-                            }
-                            search.index_chatbot_content(chatbot_id, media_doc)
-                    
-                    links = soup.find_all('a', href=True)
-                    unique_links = set()
-                    
-                    for link in links[:100]:
-                        href = link['href']
-                        full_url = urljoin(url, href)
+                        for link in links:
+                            href = link.get('href', '')
+                            if not href:
+                                continue
+                            full_url = urljoin(url, href)
+                            
+                            if self._is_same_domain(full_url, start_url):
+                                normalized_link = self._normalize_url(full_url)
+                                if (normalized_link not in self.visited and 
+                                    normalized_link not in unique_links and
+                                    normalized_link not in to_visit):
+                                    unique_links.add(normalized_link)
                         
-                        if self._is_same_domain(full_url, start_url):
-                            normalized_link = self._normalize_url(full_url)
-                            if (normalized_link not in self.visited and 
-                                normalized_link not in unique_links and
-                                normalized_link not in to_visit):
-                                unique_links.add(normalized_link)
-                    
-                    to_visit.extend(list(unique_links)[:50])
+                        to_visit.extend(list(unique_links)[:50])
                 
                 except Exception as e:
                     error_msg = str(e).lower()
                     print(f"❌ Error scraping {url}: {e}")
                     
-                    # Check if it's a blocking/timeout error
                     if any(keyword in error_msg for keyword in ['timeout', 'refused', 'unreachable', '403', '429']):
                         print(f"⚠️ Site appears to be blocking requests")
                         consecutive_failures += 1
@@ -499,17 +488,52 @@ class WebScraper:
                     continue
         
         finally:
-            try:
-                driver.quit()
-            except:
-                pass
+            if pages_batch:
+                self._batch_index_pages(pages_batch, chatbot_id, domain_id)
             
-            # Force cleanup Chrome processes
-            try:
-                import subprocess
-                subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
-            except:
-                pass
+            self._cleanup_driver()
+            gc.collect()
         
         return scraped_pages
+    
+    def _batch_index_pages(self, pages_batch: List, chatbot_id: int, domain_id: int):
+        """Batch process and index multiple pages together"""
+        try:
+            for scraped_page, content_data, media_transcriptions in pages_batch:
+                tags = search.generate_content_tags(content_data['title'], content_data['content'])
+                scraped_page.tags = tags
+                
+                chunks = self._chunk_text(content_data['content'])
+                
+                for idx, chunk in enumerate(chunks):
+                    doc = {
+                        'url': scraped_page.url,
+                        'title': content_data['title'],
+                        'content': chunk,
+                        'chunk_index': idx,
+                        'chatbot_id': chatbot_id,
+                        'domain_id': domain_id,
+                        'tags': tags
+                    }
+                    search.index_chatbot_content(chatbot_id, doc)
+                
+                for media_trans in media_transcriptions:
+                    media_tags = search.generate_content_tags(
+                        f"{content_data['title']} - {media_trans['type']}", 
+                        media_trans['transcription']
+                    )
+                    media_doc = {
+                        'url': scraped_page.url,
+                        'title': f"{content_data['title']} - {media_trans['type'].upper()}",
+                        'content': media_trans['transcription'],
+                        'chunk_index': 0,
+                        'chatbot_id': chatbot_id,
+                        'domain_id': domain_id,
+                        'media_type': media_trans['type'],
+                        'media_url': media_trans['url'],
+                        'tags': media_tags
+                    }
+                    search.index_chatbot_content(chatbot_id, media_doc)
+        except Exception as e:
+            print(f"⚠️ Batch indexing error: {e}")
 

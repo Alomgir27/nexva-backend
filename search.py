@@ -113,7 +113,7 @@ Return ONLY comma-separated tags, nothing else:"""
                 "stream": False,
                 "options": {"temperature": 0.3, "num_predict": 30}
             },
-            timeout=8.0
+            timeout=5.0
         )
         
         if response.status_code == 200:
@@ -121,8 +121,10 @@ Return ONLY comma-separated tags, nothing else:"""
             tags = [t.strip().lower() for t in tags_text.replace('\n', ',').split(',')]
             tags = [t for t in tags if t and 2 < len(t) < 25 and '-' not in t[0]]
             return tags[:5]
-    except Exception as e:
-        print(f"Tag generation error: {e}")
+    except httpx.TimeoutException:
+        pass
+    except Exception:
+        pass
     return []
 
 async def extract_search_keywords(query: str) -> str:
