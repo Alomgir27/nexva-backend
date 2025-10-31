@@ -42,7 +42,7 @@ export const NexvaChat = {
     console.log('[Nexva] Event listeners attached');
     
     // Initialize notification audio
-    const audioPath = new URL('./notifications.wav', import.meta.url).href;
+    const audioPath = `${this.config.apiUrl}/notifications.wav`;
     this.notificationAudio = new Audio(audioPath);
     this.notificationAudio.volume = 1.0;
     
