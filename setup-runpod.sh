@@ -13,12 +13,25 @@ echo "🧹 Cleaning up..."
 find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name '*.pyc' -delete 2>/dev/null || true
 
-echo "🔪 Killing processes on port $PORT..."
+echo "🔪 Checking port $PORT..."
 apt-get install -y lsof psmisc >/dev/null 2>&1 || true
-lsof -ti:$PORT | xargs kill -9 2>/dev/null || fuser -k $PORT/tcp 2>/dev/null || true
-pkill -f "uvicorn main:app" 2>/dev/null || true
-pkill -f "ollama serve" 2>/dev/null || true
-sleep 2
+
+PID_ON_PORT=$(lsof -ti:$PORT 2>/dev/null | head -1)
+if [ -n "$PID_ON_PORT" ]; then
+    CMD=$(ps -p $PID_ON_PORT -o cmd= 2>/dev/null || true)
+    if echo "$CMD" | grep -q "uvicorn.*main:app"; then
+        echo "   Killing old Nexva backend (PID: $PID_ON_PORT)"
+        kill -9 $PID_ON_PORT 2>/dev/null || true
+        sleep 2
+    else
+        echo "   ❌ Port $PORT already in use by another service"
+        echo "   Process: $CMD"
+        exit 1
+    fi
+fi
+
+pkill -f "nexva-backend.*uvicorn.*main:app" 2>/dev/null || true
+sleep 1
 
 echo ""
 echo "📦 Installing PostgreSQL..."
@@ -64,6 +77,7 @@ EOF
     sleep 2
     
     rm -f /etc/elasticsearch/elasticsearch.keystore 2>/dev/null || true
+    sysctl -w vm.max_map_count=262144 >/dev/null 2>&1 || true
     
     export ES_JAVA_HOME=/usr/share/elasticsearch/jdk
     su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid" 2>/dev/null
