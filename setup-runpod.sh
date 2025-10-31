@@ -12,6 +12,10 @@ PORT=8001
 echo "🧹 Cleaning up..."
 find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name '*.pyc' -delete 2>/dev/null || true
+
+echo "🔪 Killing processes on port $PORT..."
+lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
+fuser -k $PORT/tcp 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "ollama serve" 2>/dev/null || true
 sleep 2
@@ -32,43 +36,50 @@ echo "   ✅ PostgreSQL ready"
 
 echo ""
 echo "📦 Installing Elasticsearch..."
-if ! command -v elasticsearch &> /dev/null; then
-    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - >/dev/null 2>&1
-    echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list >/dev/null
-    apt-get update -qq
-    apt-get install -y elasticsearch >/dev/null 2>&1
+if ! pgrep -f "elasticsearch" > /dev/null 2>&1; then
+    if ! command -v elasticsearch &> /dev/null; then
+        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - >/dev/null 2>&1
+        echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list >/dev/null
+        apt-get update -qq
+        apt-get install -y elasticsearch >/dev/null 2>&1
+        
+        echo "xpack.security.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
+        echo "xpack.security.enrollment.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
+    fi
     
-    echo "xpack.security.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
-    echo "xpack.security.enrollment.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
+    pkill -f elasticsearch 2>/dev/null || true
+    su - elasticsearch -s /bin/bash -c "/usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null || \
+    nohup /usr/share/elasticsearch/bin/elasticsearch > /dev/null 2>&1 &
+    
+    echo "   Waiting for Elasticsearch..."
+    sleep 15
 fi
-
-service elasticsearch start || true
-sleep 10
 
 if curl -s http://localhost:9200 > /dev/null 2>&1; then
     echo "   ✅ Elasticsearch ready"
 else
-    echo "   ⚠️  Elasticsearch starting (may take a moment)"
+    echo "   ⚠️  Elasticsearch may need more time"
 fi
 
 echo ""
-echo "🤖 Installing Ollama..."
+echo "🤖 Installing Ollama (CPU mode)..."
 if ! command -v ollama &> /dev/null; then
     curl -fsSL https://ollama.ai/install.sh | sh
 fi
 
 if ! pgrep -f "ollama serve" > /dev/null 2>&1; then
+    pkill -f "ollama serve" 2>/dev/null || true
     nohup ollama serve > /dev/null 2>&1 &
     sleep 5
 fi
 
 if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-    echo "   ✅ Ollama running"
+    echo "   ✅ Ollama running (CPU)"
     
     if curl -s http://localhost:11434/api/tags | grep -q "llama3.2"; then
         echo "   ✅ Llama 3.2 model found"
     else
-        echo "   📥 Pulling Llama 3.2:3b model..."
+        echo "   📥 Pulling Llama 3.2:3b model (CPU)..."
         ollama pull llama3.2:3b
     fi
 fi
