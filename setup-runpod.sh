@@ -14,7 +14,7 @@ find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name '*.pyc' -delete 2>/dev/null || true
 
 echo "🔪 Freeing port $PORT..."
-apt-get install -y lsof psmisc net-tools >/dev/null 2>&1 || true
+apt-get install -y lsof psmisc net-tools ffmpeg >/dev/null 2>&1 || true
 
 # Kill existing processes
 pkill -9 -f "/workspace/nexva-backend.*uvicorn" 2>/dev/null || true
