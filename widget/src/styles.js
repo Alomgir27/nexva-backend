@@ -48,6 +48,36 @@ export const Styles = {
       .nexva-chat-button svg { transition: transform 0.3s ease; }
       .nexva-chat-button:hover svg { transform: ${bubbleAnimation === 'shake' ? 'rotate(-10deg)' : 'scale(1.1)'}; }
       .nexva-chat-button img { width: 60%; height: 60%; object-fit: contain; }
+      .nexva-notification-bubble {
+        position: fixed;
+        ${position.includes('bottom') ? 'bottom: ' + (parseInt(bubbleSize) + 30) + 'px;' : 'top: ' + (parseInt(bubbleSize) + 30) + 'px;'}
+        ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'}
+        background: white;
+        padding: 10px 14px;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s ease;
+        z-index: 999998;
+        max-width: 200px;
+      }
+      .nexva-notification-bubble.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .nexva-notification-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #1f2937;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .nexva-notification-content svg {
+        color: ${primaryColor};
+        flex-shrink: 0;
+      }
       .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: 400px; height: 650px; max-height: calc(100vh - 120px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 1px solid ${borderColor}; }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }

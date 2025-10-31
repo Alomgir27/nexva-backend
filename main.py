@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, Dict, List
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import models
 import search
@@ -23,6 +23,7 @@ import plan_config
 import asyncio
 import os
 import shutil
+import secrets
 
 from neural_tts_service import neural_tts
 
@@ -133,6 +134,7 @@ class SupportMemberInvite(BaseModel):
     name: str
 
 class SupportMemberResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     email: str
     name: str
@@ -604,11 +606,25 @@ async def transcription_websocket(websocket: WebSocket, api_key: str):
     await transcription_service.handle_transcription_only(websocket, api_key)
 
 @app.websocket("/ws/support/{ticket_id}")
-async def support_websocket(websocket: WebSocket, ticket_id: int, support_email: str):
+async def support_websocket(websocket: WebSocket, ticket_id: int, token: str):
     """Support team member WebSocket for responding to tickets"""
     db = models.SessionLocal()
     try:
-        await websocket_handler.handle_support_websocket(websocket, ticket_id, support_email, db)
+        user = auth_service.get_user_from_token(token, db)
+        if not user:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+        
+        ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
+        if not ticket:
+            await websocket.close(code=4004, reason="Ticket not found")
+            return
+        
+        if not auth_service.verify_support_member_access(user, ticket.chatbot_id, db):
+            await websocket.close(code=4003, reason="Access denied")
+            return
+        
+        await websocket_handler.handle_support_websocket(websocket, ticket_id, user, db)
     finally:
         db.close()
 
@@ -667,11 +683,16 @@ def invite_support_member(
     if existing:
         raise HTTPException(status_code=400, detail="Member already invited")
     
+    invitation_token = secrets.token_urlsafe(32)
+    invitation_expires_at = datetime.utcnow() + timedelta(days=7)
+    
     member = models.SupportTeamMember(
         chatbot_id=chatbot_id,
         email=member_data.email,
         name=member_data.name,
-        invited_by=current_user.id
+        invited_by=current_user.id,
+        invitation_token=invitation_token,
+        invitation_expires_at=invitation_expires_at
     )
     db.add(member)
     db.commit()
@@ -681,10 +702,97 @@ def invite_support_member(
         member_data.email,
         member_data.name,
         chatbot.name,
-        current_user.email
+        current_user.email,
+        invitation_token
     )
     
     return member
+
+@app.post("/api/support/accept-invitation")
+def accept_support_invitation(
+    token: str,
+    password: Optional[str] = None,
+    db: Session = Depends(models.get_db)
+):
+    """Accept support team invitation. Creates account if user doesn't exist."""
+    invitation = db.query(models.SupportTeamMember).filter(
+        models.SupportTeamMember.invitation_token == token
+    ).first()
+    
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invalid invitation token")
+    
+    if invitation.status == "active":
+        raise HTTPException(status_code=400, detail="Invitation already accepted")
+    
+    if invitation.invitation_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invitation has expired")
+    
+    user = db.query(models.User).filter(models.User.email == invitation.email).first()
+    
+    if not user:
+        if not password:
+            raise HTTPException(
+                status_code=400, 
+                detail="Password required for new account"
+            )
+        
+        user = auth_service.create_user(db, invitation.email, password)
+    
+    invitation.status = "active"
+    invitation.accepted_at = datetime.utcnow()
+    db.commit()
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == invitation.chatbot_id
+    ).first()
+    
+    token = auth_service.create_access_token({"sub": str(user.id)})
+    
+    return {
+        "message": "Invitation accepted successfully",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email
+        },
+        "chatbot": {
+            "id": chatbot.id,
+            "name": chatbot.name
+        } if chatbot else None
+    }
+
+@app.get("/api/support/invitation/{token}")
+def get_invitation_details(token: str, db: Session = Depends(models.get_db)):
+    """Get invitation details to check if user needs to create account"""
+    invitation = db.query(models.SupportTeamMember).filter(
+        models.SupportTeamMember.invitation_token == token
+    ).first()
+    
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invalid invitation token")
+    
+    if invitation.status == "active":
+        raise HTTPException(status_code=400, detail="Invitation already accepted")
+    
+    if invitation.invitation_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invitation has expired")
+    
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == invitation.chatbot_id
+    ).first()
+    
+    user_exists = db.query(models.User).filter(
+        models.User.email == invitation.email
+    ).first() is not None
+    
+    return {
+        "email": invitation.email,
+        "name": invitation.name,
+        "chatbot_name": chatbot.name if chatbot else "Unknown",
+        "user_exists": user_exists,
+        "expires_at": invitation.invitation_expires_at.isoformat()
+    }
 
 @app.get("/api/chatbots/{chatbot_id}/support-team", response_model=List[SupportMemberResponse])
 def list_support_team(
@@ -735,12 +843,20 @@ def list_support_tickets(
     current_user: models.User = Depends(auth_service.get_current_user),
     db: Session = Depends(models.get_db)
 ):
-    query = db.query(models.SupportTicket).join(models.Chatbot).filter(
-        models.Chatbot.user_id == current_user.id
+    accessible_chatbot_ids = auth_service.get_accessible_chatbot_ids(current_user, db)
+    
+    if not accessible_chatbot_ids:
+        return []
+    
+    query = db.query(models.SupportTicket).filter(
+        models.SupportTicket.chatbot_id.in_(accessible_chatbot_ids)
     )
     
     if chatbot_id:
+        if chatbot_id not in accessible_chatbot_ids:
+            raise HTTPException(status_code=403, detail="Access denied to this chatbot")
         query = query.filter(models.SupportTicket.chatbot_id == chatbot_id)
+    
     if status:
         query = query.filter(models.SupportTicket.status == status)
     
@@ -772,6 +888,7 @@ def list_support_tickets(
             "chatbot_name": chatbot.name if chatbot else "Unknown",
             "status": ticket.status,
             "priority": ticket.priority,
+            "assigned_to": ticket.assigned_to,
             "last_message": last_message.content if last_message else "",
             "created_at": ticket.created_at.isoformat(),
             "resolved_at": ticket.resolved_at.isoformat() if ticket.resolved_at else None
@@ -791,12 +908,8 @@ def get_support_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    chatbot = db.query(models.Chatbot).filter(
-        models.Chatbot.id == ticket.chatbot_id,
-        models.Chatbot.user_id == current_user.id
-    ).first()
-    if not chatbot:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not auth_service.verify_support_member_access(current_user, ticket.chatbot_id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
     
     message_query = db.query(models.Message).filter(
         models.Message.conversation_id == ticket.conversation_id,
@@ -817,6 +930,7 @@ def get_support_ticket(
             "chatbot_id": ticket.chatbot_id,
             "status": ticket.status,
             "priority": ticket.priority,
+            "assigned_to": ticket.assigned_to,
             "created_at": ticket.created_at.isoformat(),
             "resolved_at": ticket.resolved_at.isoformat() if ticket.resolved_at else None
         },
@@ -983,12 +1097,8 @@ async def resolve_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    chatbot = db.query(models.Chatbot).filter(
-        models.Chatbot.id == ticket.chatbot_id,
-        models.Chatbot.user_id == current_user.id
-    ).first()
-    if not chatbot:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not auth_service.verify_support_member_access(current_user, ticket.chatbot_id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
     
     ticket.status = "resolved"
     ticket.resolved_at = datetime.utcnow()
@@ -1022,24 +1132,21 @@ def send_support_message(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    chatbot = db.query(models.Chatbot).filter(
-        models.Chatbot.id == ticket.chatbot_id,
-        models.Chatbot.user_id == current_user.id
-    ).first()
-    if not chatbot:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not auth_service.verify_support_member_access(current_user, ticket.chatbot_id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
     
     message = models.Message(
         conversation_id=ticket.conversation_id,
         role='assistant',
         content=message_data.get('message', ''),
         sender_type='support',
-        sender_email=message_data.get('sender_email', current_user.email)
+        sender_email=current_user.email
     )
     db.add(message)
     
     if ticket.status == "open":
         ticket.status = "in_progress"
+        ticket.assigned_to = current_user.email
     
     db.commit()
     db.refresh(message)

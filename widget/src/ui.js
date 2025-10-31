@@ -35,6 +35,14 @@ export const UI = {
       <button class="nexva-chat-button" id="nexvaChatButton" aria-label="Open chat">
         ${buttonContent}
       </button>
+      <div class="nexva-notification-bubble" id="nexvaNotificationBubble" style="display: none;">
+        <div class="nexva-notification-content">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+          <span>Support replied!</span>
+        </div>
+      </div>
       <div class="nexva-chat-window" id="nexvaChatWindow">
         <div class="nexva-chat-header">
           <div class="nexva-chat-header-top">
@@ -263,6 +271,26 @@ export const UI = {
           titleElement.style.transform = 'translateY(0)';
           titleElement.style.opacity = '1';
         }, 50);
+      }, 300);
+    }
+  },
+  
+  showNotificationBubble: function() {
+    const bubble = document.getElementById('nexvaNotificationBubble');
+    if (bubble) {
+      bubble.style.display = 'block';
+      setTimeout(() => {
+        bubble.classList.add('show');
+      }, 10);
+    }
+  },
+  
+  hideNotificationBubble: function() {
+    const bubble = document.getElementById('nexvaNotificationBubble');
+    if (bubble) {
+      bubble.classList.remove('show');
+      setTimeout(() => {
+        bubble.style.display = 'none';
       }, 300);
     }
   }

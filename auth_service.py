@@ -95,3 +95,49 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[models
         return None
     return user
 
+def get_user_from_token(token: str, db: Session) -> Optional[models.User]:
+    """Decode token and return user without raising exceptions"""
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+    
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        return None
+    
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        return None
+    
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+def verify_support_member_access(user: models.User, chatbot_id: int, db: Session) -> bool:
+    """Check if user is chatbot owner or an active support team member"""
+    chatbot = db.query(models.Chatbot).filter(models.Chatbot.id == chatbot_id).first()
+    if not chatbot:
+        return False
+    
+    if chatbot.user_id == user.id:
+        return True
+    
+    support_member = db.query(models.SupportTeamMember).filter(
+        models.SupportTeamMember.chatbot_id == chatbot_id,
+        models.SupportTeamMember.email == user.email,
+        models.SupportTeamMember.status == "active"
+    ).first()
+    
+    return support_member is not None
+
+def get_accessible_chatbot_ids(user: models.User, db: Session) -> list[int]:
+    """Get all chatbot IDs user has access to (owned or support member)"""
+    owned = db.query(models.Chatbot.id).filter(models.Chatbot.user_id == user.id).all()
+    
+    support = db.query(models.SupportTeamMember.chatbot_id).filter(
+        models.SupportTeamMember.email == user.email,
+        models.SupportTeamMember.status == "active"
+    ).all()
+    
+    chatbot_ids = [c[0] for c in owned] + [s[0] for s in support]
+    return list(set(chatbot_ids))
+

@@ -10,6 +10,7 @@ export const WebSocketManager = {
   isPlayingAudio: false,
   sessionId: null,
   apiKey: null,
+  onSupportMessage: null,
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
@@ -68,6 +69,10 @@ export const WebSocketManager = {
       } else if (data.type === 'human_message') {
         console.log('[WebSocket] ✅ Received human message:', data.content.substring(0, 50));
         Messaging.addHumanMessage(data.content, data.sender_email);
+        
+        if (this.onSupportMessage) {
+          this.onSupportMessage();
+        }
       } else if (data.type === 'ticket_resolved') {
         console.log('[WebSocket] Ticket resolved, switching to AI mode');
         Messaging.addMessage('system', '✅ ' + data.message);

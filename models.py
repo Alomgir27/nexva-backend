@@ -107,7 +107,10 @@ class SupportTeamMember(Base):
     name = Column(String(255), nullable=False)
     role = Column(String(50), default="support")
     invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String(20), default="active")
+    status = Column(String(20), default="pending")
+    invitation_token = Column(String(100), unique=True, index=True)
+    invitation_expires_at = Column(DateTime)
+    accepted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class SupportTicket(Base):

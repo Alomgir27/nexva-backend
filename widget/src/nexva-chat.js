@@ -13,6 +13,8 @@ export const NexvaChat = {
   initialized: false,
   conversationId: null,
   currentMode: 'ai',
+  hasReceivedSupportResponse: false,
+  notificationAudio: null,
   
   init: function(apiKey, options) {
     console.log('[Nexva] Initializing widget...', { apiKey, options });
@@ -38,6 +40,11 @@ export const NexvaChat = {
     console.log('[Nexva] Widget created');
     this.attachEventListeners();
     console.log('[Nexva] Event listeners attached');
+    
+    // Initialize notification audio
+    const audioPath = new URL('./notifications.wav', import.meta.url).href;
+    this.notificationAudio = new Audio(audioPath);
+    this.notificationAudio.volume = 1.0;
     
     this.initialized = true;
     
@@ -307,6 +314,7 @@ export const NexvaChat = {
   openChat: function() {
     console.log('[Nexva] openChat called');
     this.isOpen = true;
+    this.hideNotification();
     UI.toggleChat(true);
     
     const existingConversationId = Utils.getConversationId(this.config.apiKey);
@@ -327,6 +335,13 @@ export const NexvaChat = {
       }
       this.updateActions();
     }, existingConversationId);
+    
+    WebSocketManager.onSupportMessage = () => {
+      if (!this.hasReceivedSupportResponse) {
+        this.hasReceivedSupportResponse = true;
+        this.showNotification();
+      }
+    };
     
     this.updateActions();
     console.log('[Nexva] Chat opened, isOpen:', this.isOpen);
@@ -466,6 +481,7 @@ export const NexvaChat = {
     })
     .then(data => {
       this.supportRequested = true;
+      this.hasReceivedSupportResponse = false;
       const message = data.message || 'Support requested';
       Messaging.addMessage('system', `✅ ${message}. A team member will assist you shortly.`);
       this.updateActions();
@@ -476,6 +492,26 @@ export const NexvaChat = {
         : '❌ Failed to request support. Please try again.';
       Messaging.addMessage('system', errorMsg);
     });
+  },
+  
+  showNotification: function() {
+    if (!this.isOpen) {
+      UI.showNotificationBubble();
+      this.playNotificationSound();
+    }
+  },
+  
+  hideNotification: function() {
+    UI.hideNotificationBubble();
+  },
+  
+  playNotificationSound: function() {
+    if (this.notificationAudio) {
+      this.notificationAudio.currentTime = 0;
+      this.notificationAudio.play().catch(err => {
+        console.log('[Nexva] Notification sound blocked:', err);
+      });
+    }
   }
 };
 

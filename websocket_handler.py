@@ -192,7 +192,7 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         if conversation.id in manager.conversation_connections:
             del manager.conversation_connections[conversation.id]
 
-async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support_email: str, db: Session):
+async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
     
     if not ticket:
@@ -215,7 +215,7 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support
                 role='assistant',
                 content=content,
                 sender_type='support',
-                sender_email=support_email
+                sender_email=user.email
             )
             db.add(db_message)
             db.commit()
@@ -223,6 +223,7 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support
             
             if ticket.status == "open":
                 ticket.status = "in_progress"
+                ticket.assigned_to = user.email
                 db.commit()
             
             message_obj = {
@@ -230,7 +231,7 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support
                 'role': 'assistant',
                 'content': content,
                 'sender_type': 'support',
-                'sender_email': support_email,
+                'sender_email': user.email,
                 'created_at': db_message.created_at.isoformat()
             }
             
@@ -242,7 +243,7 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support
             sent = await manager.send_to_conversation(ticket.conversation_id, {
                 'type': 'human_message',
                 'content': content,
-                'sender_email': support_email,
+                'sender_email': user.email,
                 'timestamp': db_message.created_at.isoformat()
             })
             
