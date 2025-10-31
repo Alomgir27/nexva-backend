@@ -52,6 +52,9 @@ network.host: 127.0.0.1
 http.port: 9200
 xpack.security.enabled: false
 xpack.security.enrollment.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+discovery.type: single-node
 EOF
         
         chown -R elasticsearch:elasticsearch /var/lib/elasticsearch /var/log/elasticsearch /etc/elasticsearch
@@ -59,6 +62,8 @@ EOF
     
     pkill -9 -f "org.elasticsearch.bootstrap.Elasticsearch" 2>/dev/null || true
     sleep 2
+    
+    rm -f /etc/elasticsearch/elasticsearch.keystore 2>/dev/null || true
     
     export ES_JAVA_HOME=/usr/share/elasticsearch/jdk
     su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid" 2>/dev/null
