@@ -14,8 +14,8 @@ find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name '*.pyc' -delete 2>/dev/null || true
 
 echo "🔪 Killing processes on port $PORT..."
-lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
-fuser -k $PORT/tcp 2>/dev/null || true
+apt-get install -y lsof psmisc >/dev/null 2>&1 || true
+lsof -ti:$PORT | xargs kill -9 2>/dev/null || fuser -k $PORT/tcp 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "ollama serve" 2>/dev/null || true
 sleep 2
@@ -36,29 +36,46 @@ echo "   ✅ PostgreSQL ready"
 
 echo ""
 echo "📦 Installing Elasticsearch..."
-if ! pgrep -f "elasticsearch" > /dev/null 2>&1; then
+if ! pgrep -f "org.elasticsearch.bootstrap.Elasticsearch" > /dev/null 2>&1; then
     if ! command -v elasticsearch &> /dev/null; then
-        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - >/dev/null 2>&1
-        echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list >/dev/null
-        apt-get update -qq
+        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch 2>/dev/null | apt-key add - >/dev/null 2>&1
+        echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list
+        apt-get update -qq 2>/dev/null
         apt-get install -y elasticsearch >/dev/null 2>&1
         
-        echo "xpack.security.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
-        echo "xpack.security.enrollment.enabled: false" >> /etc/elasticsearch/elasticsearch.yml
+        cat > /etc/elasticsearch/elasticsearch.yml << EOF
+cluster.name: nexva-cluster
+node.name: nexva-node
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 127.0.0.1
+http.port: 9200
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+EOF
+        
+        chown -R elasticsearch:elasticsearch /var/lib/elasticsearch /var/log/elasticsearch /etc/elasticsearch
     fi
     
-    pkill -f elasticsearch 2>/dev/null || true
-    su - elasticsearch -s /bin/bash -c "/usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null || \
-    nohup /usr/share/elasticsearch/bin/elasticsearch > /dev/null 2>&1 &
+    pkill -9 -f "org.elasticsearch.bootstrap.Elasticsearch" 2>/dev/null || true
+    sleep 2
     
-    echo "   Waiting for Elasticsearch..."
-    sleep 15
-fi
-
-if curl -s http://localhost:9200 > /dev/null 2>&1; then
-    echo "   ✅ Elasticsearch ready"
+    export ES_JAVA_HOME=/usr/share/elasticsearch/jdk
+    su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid" 2>/dev/null
+    
+    echo "   Waiting for Elasticsearch to start..."
+    for i in {1..30}; do
+        if curl -s http://localhost:9200 > /dev/null 2>&1; then
+            echo "   ✅ Elasticsearch ready"
+            break
+        fi
+        sleep 2
+        if [ $i -eq 30 ]; then
+            echo "   ⚠️  Elasticsearch timeout - check logs: /var/log/elasticsearch/"
+        fi
+    done
 else
-    echo "   ⚠️  Elasticsearch may need more time"
+    echo "   ✅ Elasticsearch already running"
 fi
 
 echo ""
