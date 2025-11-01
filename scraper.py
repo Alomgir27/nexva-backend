@@ -17,9 +17,12 @@ from threading import Lock
 from pydub import AudioSegment
 from transcription_service import transcribe_audio_file
 import yt_dlp
+import socket
 
 _DRIVER_PATH = os.environ.get("CHROMEDRIVER_PATH")
 _DRIVER_PATH_LOCK = Lock()
+_PORT_LOCK = Lock()
+_USED_PORTS = set()
 
 
 class WebScraper:
@@ -35,6 +38,26 @@ class WebScraper:
         else:
             self.process_media = process_media
         
+    def _get_free_port(self):
+        """Get a free port for Chrome remote debugging"""
+        with _PORT_LOCK:
+            for port in range(9222, 9322):
+                if port not in _USED_PORTS:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    try:
+                        sock.bind(('127.0.0.1', port))
+                        sock.close()
+                        _USED_PORTS.add(port)
+                        return port
+                    except OSError:
+                        continue
+            return None
+    
+    def _release_port(self, port):
+        """Release port when driver closes"""
+        with _PORT_LOCK:
+            _USED_PORTS.discard(port)
+    
     def _get_driver(self):
         if self.driver:
             return self.driver
@@ -42,6 +65,11 @@ class WebScraper:
         print(f"🔧 Initializing Chrome WebDriver...")
         try:
             if not self._driver_options:
+                port = self._get_free_port()
+                if not port:
+                    raise Exception("No free ports available for Chrome")
+                
+                self._remote_debugging_port = port
                 options = Options()
                 options.add_argument('--headless')
                 options.add_argument('--no-sandbox')
@@ -54,6 +82,7 @@ class WebScraper:
                 options.add_argument('--disable-software-rasterizer')
                 options.add_argument('--disable-images')
                 options.add_argument('--blink-settings=imagesEnabled=false')
+                options.add_argument(f'--remote-debugging-port={port}')
                 options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
                 options.page_load_strategy = 'normal'
                 self._driver_options = options
@@ -70,14 +99,16 @@ class WebScraper:
 
             service = Service(_DRIVER_PATH)
 
-            print(f"🚀 Starting Chrome browser...")
+            print(f"🚀 Starting Chrome browser on port {self._remote_debugging_port}...")
             self.driver = webdriver.Chrome(service=service, options=self._driver_options)
             self.driver.set_page_load_timeout(15)
             self.driver.set_script_timeout(10)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            print(f"✅ Chrome WebDriver ready")
+            print(f"✅ Chrome WebDriver ready on port {self._remote_debugging_port}")
             return self.driver
         except Exception as e:
+            if hasattr(self, '_remote_debugging_port'):
+                self._release_port(self._remote_debugging_port)
             print(f"❌ Failed to initialize Chrome WebDriver: {e}")
             raise
     
@@ -89,6 +120,8 @@ class WebScraper:
                 pass
             finally:
                 self.driver = None
+                if hasattr(self, '_remote_debugging_port'):
+                    self._release_port(self._remote_debugging_port)
                 
         try:
             import subprocess
