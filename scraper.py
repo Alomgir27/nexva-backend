@@ -201,34 +201,17 @@ class WebScraper:
         return None
     
     def _extract_media_urls(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, str]]:
-        """Extract audio and video URLs from page including YouTube/Vimeo"""
+        """Extract video URLs only (no audio) including YouTube/Vimeo"""
         media_files = []
         seen_urls = set()
-        supported_formats = ['.mp3', '.mp4', '.webm', '.wav', '.ogg', '.m4a', '.avi', '.mov', '.flv']
+        video_formats = ['.mp4', '.webm', '.avi', '.mov', '.flv']
         
-        # Find audio tags
-        for audio in soup.find_all('audio'):
-            src = audio.get('src')
-            if src:
-                full_url = urljoin(base_url, src)
-                if any(full_url.lower().endswith(fmt) for fmt in supported_formats) and full_url not in seen_urls:
-                    media_files.append({'type': 'audio', 'url': full_url})
-                    seen_urls.add(full_url)
-            
-            for source in audio.find_all('source'):
-                src = source.get('src')
-                if src:
-                    full_url = urljoin(base_url, src)
-                    if any(full_url.lower().endswith(fmt) for fmt in supported_formats) and full_url not in seen_urls:
-                        media_files.append({'type': 'audio', 'url': full_url})
-                        seen_urls.add(full_url)
-        
-        # Find video tags
+        # Find video tags only
         for video in soup.find_all('video'):
             src = video.get('src')
             if src:
                 full_url = urljoin(base_url, src)
-                if any(full_url.lower().endswith(fmt) for fmt in supported_formats) and full_url not in seen_urls:
+                if any(full_url.lower().endswith(fmt) for fmt in video_formats) and full_url not in seen_urls:
                     media_files.append({'type': 'video', 'url': full_url})
                     seen_urls.add(full_url)
             
@@ -236,7 +219,7 @@ class WebScraper:
                 src = source.get('src')
                 if src:
                     full_url = urljoin(base_url, src)
-                    if any(full_url.lower().endswith(fmt) for fmt in supported_formats) and full_url not in seen_urls:
+                    if any(full_url.lower().endswith(fmt) for fmt in video_formats) and full_url not in seen_urls:
                         media_files.append({'type': 'video', 'url': full_url})
                         seen_urls.add(full_url)
         
@@ -255,14 +238,13 @@ class WebScraper:
                     media_files.append({'type': 'vimeo', 'url': vimeo_url})
                     seen_urls.add(vimeo_url)
         
-        # Find direct video/audio links in data attributes
+        # Find direct video links in data attributes
         for elem in soup.find_all(attrs={'data-src': True}):
             src = elem.get('data-src')
-            if src and any(src.lower().endswith(fmt) for fmt in supported_formats):
+            if src and any(src.lower().endswith(fmt) for fmt in video_formats):
                 full_url = urljoin(base_url, src)
                 if full_url not in seen_urls:
-                    media_type = 'audio' if any(src.lower().endswith(fmt) for fmt in ['.mp3', '.wav', '.ogg', '.m4a']) else 'video'
-                    media_files.append({'type': media_type, 'url': full_url})
+                    media_files.append({'type': 'video', 'url': full_url})
                     seen_urls.add(full_url)
         
         return media_files[:3]
@@ -440,13 +422,25 @@ class WebScraper:
                         driver.get(url)
                         time.sleep(0.5)
                     except Exception as load_error:
-                        if 'timeout' in str(load_error).lower() and 'renderer' in str(load_error).lower():
-                            print(f"⚠️ Renderer timeout on {url}, restarting driver...")
-                            self._cleanup_driver()
-                            driver = self._get_driver()
+                        error_str = str(load_error).lower()
+                        if any(keyword in error_str for keyword in ['invalid session', 'disconnected', 'renderer', 'devtools']):
+                            print(f"⚠️ Driver crashed on {url}, restarting...")
+                            try:
+                                self._cleanup_driver()
+                                driver = self._get_driver()
+                                pages_since_driver_refresh = 0
+                                driver.get(url)
+                                time.sleep(0.5)
+                            except:
+                                print(f"⚠️ Driver restart failed for {url}, skipping...")
+                                consecutive_failures += 1
+                                continue
+                        elif 'timeout' in error_str:
+                            print(f"⏱️ Timeout on {url}, skipping...")
                             consecutive_failures += 1
                             continue
-                        raise
+                        else:
+                            raise
                     
                     try:
                         driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
@@ -532,17 +526,6 @@ class WebScraper:
                         pages_since_driver_refresh += 1
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
                         
-                        if pages_since_driver_refresh >= 25:
-                            print("🔄 Refreshing driver after 25 pages...")
-                            try:
-                                driver = self._restart_driver()
-                                pages_since_driver_refresh = 0
-                                time.sleep(2)
-                            except Exception as restart_error:
-                                print(f"⚠️ Driver restart failed: {restart_error}")
-                                driver = self._get_driver()
-                                pages_since_driver_refresh = 0
-                        
                         if len(pages_batch) >= 5:
                             self._batch_index_pages(pages_batch, chatbot_id, domain_id)
                             pages_batch.clear()
@@ -569,29 +552,28 @@ class WebScraper:
                     error_msg = str(e).lower()
                     print(f"❌ Error scraping {url}: {e}")
                     
-                    if any(keyword in error_msg for keyword in ['connection refused', 'connection aborted', 'remote end closed']):
-                        print(f"⚠️ Driver crashed, restarting...")
+                    if any(keyword in error_msg for keyword in ['invalid session', 'disconnected', 'devtools', 'renderer']):
+                        print(f"🔄 Driver crashed, attempting restart...")
                         consecutive_failures += 1
                         
                         if consecutive_failures < max_consecutive_failures:
                             try:
-                                time.sleep(2)
-                                driver = self._restart_driver()
+                                self._cleanup_driver()
+                                time.sleep(3)
+                                driver = self._get_driver()
                                 pages_since_driver_refresh = 0
-                                time.sleep(2)
+                                time.sleep(1)
                                 to_visit.insert(0, url)
                                 self.visited.discard(normalized_url)
+                                consecutive_failures = 0
                                 continue
                             except Exception as restart_error:
                                 print(f"❌ Failed to restart driver: {restart_error}")
                                 consecutive_failures += 1
-                    
-                    if any(keyword in error_msg for keyword in ['timeout', 'refused', 'unreachable', '403', '429', 'blocked']):
-                        print(f"⚠️ Site appears to be blocking requests")
+                    else:
                         consecutive_failures += 1
                     
                     self.failed_attempts[normalized_url] = self.failed_attempts.get(normalized_url, 0) + 1
-                    consecutive_failures += 1
                     continue
         
         finally:
