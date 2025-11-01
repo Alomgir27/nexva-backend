@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, JSON, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, JSON, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -85,7 +85,12 @@ class Conversation(Base):
     support_requested = Column(Integer, default=0)
     ticket_id = Column(Integer, ForeignKey("support_tickets.id"), nullable=True, index=True)
     mode = Column(String(20), default="ai")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    __table_args__ = (
+        Index('idx_chatbot_session', 'chatbot_id', 'session_id'),
+        Index('idx_chatbot_created', 'chatbot_id', 'created_at'),
+    )
 
 class Message(Base):
     __tablename__ = "messages"
@@ -96,7 +101,11 @@ class Message(Base):
     content = Column(Text, nullable=False)
     sender_type = Column(String(20), default="ai")
     sender_email = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    __table_args__ = (
+        Index('idx_conversation_created', 'conversation_id', 'created_at'),
+    )
 
 class SupportTeamMember(Base):
     __tablename__ = "support_team_members"
@@ -119,11 +128,16 @@ class SupportTicket(Base):
     id = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
     chatbot_id = Column(Integer, ForeignKey("chatbots.id"), nullable=False, index=True)
-    status = Column(String(20), default="open")
+    status = Column(String(20), default="open", index=True)
     priority = Column(String(20), default="normal")
-    assigned_to = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    assigned_to = Column(String(255), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     resolved_at = Column(DateTime, nullable=True)
+    
+    __table_args__ = (
+        Index('idx_chatbot_status', 'chatbot_id', 'status'),
+        Index('idx_chatbot_assigned', 'chatbot_id', 'assigned_to'),
+    )
 
 class ScrapeJob(Base):
     __tablename__ = "scrape_jobs"
@@ -144,11 +158,15 @@ class Subscription(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     stripe_customer_id = Column(String(255), nullable=False, index=True)
     stripe_subscription_id = Column(String(255), nullable=False, unique=True, index=True)
-    plan_tier = Column(String(50), nullable=False)
-    status = Column(String(50), nullable=False)
+    plan_tier = Column(String(50), nullable=False, index=True)
+    status = Column(String(50), nullable=False, index=True)
     current_period_end = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_user_status', 'user_id', 'status'),
+    )
 
 def init_db():
     Base.metadata.create_all(bind=engine)

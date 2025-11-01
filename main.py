@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks,
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, Dict, List
 from contextlib import asynccontextmanager
@@ -258,6 +259,38 @@ def update_chatbot_voice(
     db.commit()
     db.refresh(chatbot)
     return {"message": "Voice updated successfully", "voice_id": chatbot.voice_id}
+
+@app.get("/api/chatbots/{chatbot_id}/stats")
+def get_chatbot_stats(
+    chatbot_id: int,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    chatbot = db.query(models.Chatbot).filter(
+        models.Chatbot.id == chatbot_id,
+        models.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    unique_customers = db.query(func.count(func.distinct(models.Conversation.session_id))).filter(
+        models.Conversation.chatbot_id == chatbot_id
+    ).scalar()
+    
+    total_conversations = db.query(func.count(models.Conversation.id)).filter(
+        models.Conversation.chatbot_id == chatbot_id
+    ).scalar()
+    
+    total_messages = db.query(func.count(models.Message.id)).join(
+        models.Conversation
+    ).filter(models.Conversation.chatbot_id == chatbot_id).scalar()
+    
+    return {
+        "chatbot_id": chatbot_id,
+        "unique_customers": unique_customers or 0,
+        "total_conversations": total_conversations or 0,
+        "total_messages": total_messages or 0
+    }
 
 # Domain Endpoints
 @app.post("/api/domains", response_model=DomainResponse)
