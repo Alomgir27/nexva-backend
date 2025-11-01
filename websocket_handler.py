@@ -81,6 +81,9 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         
         session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
         conversation_id = init_data.get('conversation_id')
+    except Exception as e:
+        print(f"Error parsing init data: {e}")
+        session_id = f"{api_key}_{datetime.utcnow().timestamp()}"
     
     conversation = None
     history = []
