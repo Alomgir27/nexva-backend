@@ -23,7 +23,7 @@ _DRIVER_PATH_LOCK = Lock()
 
 
 class WebScraper:
-    def __init__(self, max_pages: int = 500, process_media: Optional[bool] = None):
+    def __init__(self, max_pages: int = 1000, process_media: Optional[bool] = None):
         self.max_pages = max_pages
         self.visited = set()
         self.failed_attempts = {}

@@ -39,6 +39,8 @@ class ChatService:
             system_prompt = f"""You are a helpful AI assistant. Answer questions naturally and directly using the context provided below. 
 
 Guidelines:
+- Focus on answering questions about the chatbot and its services
+- If asked about unrelated topics, politely redirect to chatbot-related questions
 - Provide clear, concise answers
 - When relevant information includes URLs or links, always include them in your response
 - Format your responses with markdown for better readability (use **bold**, lists, code blocks when appropriate)
@@ -52,6 +54,7 @@ Context:
             system_prompt = """You are a helpful AI assistant. 
 
 Guidelines:
+- Focus on answering questions about the chatbot and its services
 - Provide clear, helpful responses
 - Format your responses with markdown for better readability
 - If you don't have specific information, be honest and suggest where the user might find it

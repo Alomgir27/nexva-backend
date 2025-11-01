@@ -76,33 +76,31 @@
   <script type="module">
     // Initialize the widget
     // Note: Replace 'test-key-123' with a valid API key from your dashboard
-    NexvaChat.init('cvEVs2U0ek-bmTwGeZgbdBxcL7ofbZMLSPOAkMCZ50s', {
-      apiUrl: 'http://localhost:8000',
-      logoUrl: './images/img.png',
+    NexvaChat.init('t9bn0W508wPl87S_SflizogwEnGYrk-1qtpYEOoXOZE', {
+      apiUrl: 'https://yueihds3xl383a-5000.proxy.runpod.net',
+      position: 'bottom-right',
       primaryColor: '#32f08c',
       headerText: 'Nexva Chat',
       welcomeMessage: '👋 Hi! How can I help you today?',
-      placeholder: 'Type your message...',
+      placeholder: 'Type your message here...',
       enableVoice: true,
       enableHumanSupport: true,
       theme: 'dark',
-      autoOpen: false,
-      presetQuestions: [
-        'What services do you offer?',
-        'How can I get started?',
-        'What are your pricing plans?',
-        'Do you have customer support?'
-      ],
+      borderRadius: '12px',
+      borderColor: '#E5E7EB',
+      borderWidth: '1px',
       bubble: {
         backgroundColor: '#32f08c',
         size: '60px',
         shape: 'circle',
         icon: 'chat',
         iconColor: '#ffffff',
+        customIconUrl: '',
         shadow: true,
         animation: 'pulse'
       }
     });
+  </script>
   </script>
 </body>
 </html>

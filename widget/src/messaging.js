@@ -86,7 +86,22 @@ export const Messaging = {
           </div>
         `;
       } else if (msg.role === 'assistant') {
-        messageDiv.innerHTML = '<div class="nexva-chat-message-content">' + this.formatMarkdown(msg.content) + '</div>';
+        const copyBtnId = 'copy-' + Math.random().toString(36).substr(2, 9);
+        messageDiv.innerHTML = `
+          <div class="nexva-chat-message-content">${this.formatMarkdown(msg.content)}</div>
+          <button class="nexva-copy-btn" id="${copyBtnId}" data-content="${Utils.escapeHtml(msg.content).replace(/"/g, '&quot;')}" aria-label="Copy message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        `;
+        setTimeout(() => {
+          const copyBtn = document.getElementById(copyBtnId);
+          if (copyBtn) {
+            copyBtn.addEventListener('click', () => this.copyToClipboard(copyBtn));
+          }
+        }, 0);
       } else {
         messageDiv.innerHTML = '<div class="nexva-chat-message-content">' + Utils.escapeHtml(msg.content) + '</div>';
       }
@@ -127,7 +142,22 @@ export const Messaging = {
     }
     
     if (role === 'assistant') {
-      messageDiv.innerHTML = '<div class="nexva-chat-message-content">' + this.formatMarkdown(content) + '</div>';
+      const copyBtnId = 'copy-' + Math.random().toString(36).substr(2, 9);
+      messageDiv.innerHTML = `
+        <div class="nexva-chat-message-content">${this.formatMarkdown(content)}</div>
+        <button class="nexva-copy-btn" id="${copyBtnId}" data-content="${Utils.escapeHtml(content).replace(/"/g, '&quot;')}" aria-label="Copy message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      `;
+      setTimeout(() => {
+        const copyBtn = document.getElementById(copyBtnId);
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => this.copyToClipboard(copyBtn));
+        }
+      }, 0);
     } else {
       messageDiv.innerHTML = '<div class="nexva-chat-message-content">' + Utils.escapeHtml(content) + '</div>';
     }
@@ -206,8 +236,43 @@ export const Messaging = {
       const contentDiv = lastMessage.querySelector('.nexva-chat-message-content');
       if (lastMessage.dataset.rawContent) {
         contentDiv.innerHTML = this.formatMarkdown(lastMessage.dataset.rawContent);
+        
+        const existingBtn = lastMessage.querySelector('.nexva-copy-btn');
+        if (!existingBtn) {
+          const copyBtnId = 'copy-' + Math.random().toString(36).substr(2, 9);
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'nexva-copy-btn';
+          copyBtn.id = copyBtnId;
+          copyBtn.setAttribute('aria-label', 'Copy message');
+          copyBtn.dataset.content = Utils.escapeHtml(lastMessage.dataset.rawContent).replace(/"/g, '&quot;');
+          copyBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          `;
+          lastMessage.appendChild(copyBtn);
+          setTimeout(() => {
+            copyBtn.addEventListener('click', () => this.copyToClipboard(copyBtn));
+          }, 0);
+        }
       }
     }
+  },
+  
+  copyToClipboard: function(button) {
+    const content = button.dataset.content.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    navigator.clipboard.writeText(content).then(() => {
+      const originalHtml = button.innerHTML;
+      button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      button.style.color = '#10b981';
+      setTimeout(() => {
+        button.innerHTML = originalHtml;
+        button.style.color = '';
+      }, 2000);
+    }).catch(err => {
+      console.error('Copy failed:', err);
+    });
   },
   
   scrollToBottom: function() {

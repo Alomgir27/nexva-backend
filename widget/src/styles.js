@@ -187,10 +187,14 @@ export const Styles = {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       }
-      .nexva-chat-message { margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; }
+      .nexva-chat-message { margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; position: relative; }
       .nexva-chat-message.user { flex-direction: row-reverse; }
       .nexva-chat-message-content { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; word-wrap: break-word; }
       .nexva-chat-message.assistant .nexva-chat-message-content { background: ${messageBg}; color: ${textDefault}; border-radius: 12px 12px 12px 4px; ${theme === 'light' ? 'border: 1px solid ' + borderColor + ';' : ''} }
+      .nexva-copy-btn { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: none; background: ${bgOverlay}; color: ${textSecondary}; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.2s; padding: 0; }
+      .nexva-copy-btn svg { width: 14px; height: 14px; }
+      .nexva-chat-message.assistant:hover .nexva-copy-btn { opacity: 1; }
+      .nexva-copy-btn:hover { background: ${primaryColor}; color: ${userMessageText}; transform: scale(1.1); }
       .nexva-chat-message.user .nexva-chat-message-content { background: ${primaryColor}; color: ${userMessageText}; border-radius: 12px 12px 4px 12px; font-weight: 500; }
       .nexva-chat-message.system .nexva-chat-message-content { background: ${bgOverlay}; color: ${textSecondary}; text-align: center; max-width: 100%; font-size: 13px; }
       .nexva-chat-message.human { align-items: flex-start; }

@@ -88,8 +88,10 @@ def build_context(results: list, query: str) -> str:
 
 def create_system_prompt(chatbot_name: str, context: str) -> str:
     return f"""You are a helpful AI assistant for {chatbot_name}. 
+Your primary purpose is to answer questions specifically about {chatbot_name} and its related services.
 Answer user questions based ONLY on the provided context from the knowledge base.
 If the context doesn't contain relevant information, politely say you don't have that information in your knowledge base.
+If asked about unrelated topics, politely redirect the conversation back to {chatbot_name}.
 Keep responses concise and natural for voice conversation (2-3 sentences max).
 
 Context from knowledge base:
@@ -180,6 +182,7 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
         await safe_send_json(websocket, {"type": "response_start"})
         
         buffer = ""
+        display_buffer = ""
         voice_id = getattr(chatbot, 'voice_id', 'female-1')
         print(f"🎤 Using voice: {voice_id}")
         
@@ -199,23 +202,24 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
                     
                     chunk = json.loads(line).get("response", "")
                     buffer += chunk
+                    display_buffer += chunk
                     
                     if not await safe_send_json(websocket, {"type": "text_chunk", "text": chunk}):
                         return
                     
-                    has_paragraph = buffer.count('. ') >= 2 or '\n\n' in buffer
-                    is_long = len(buffer) > 200
+                    has_paragraph = display_buffer.count('. ') >= 2 or '\n\n' in display_buffer
+                    is_long = len(display_buffer) > 200
                     
-                    if (has_paragraph or is_long) and len(buffer.strip()) > 50:
+                    if (has_paragraph or is_long) and len(display_buffer.strip()) > 50:
                         if interrupt_flag["interrupted"]:
                             print("🛑 Processing interrupted before TTS")
                             return
-                        print(f"🎯 Sending TTS chunk ({len(buffer)} chars, sentences: {buffer.count('. ')})")
-                        await handle_tts_chunk(websocket, buffer, voice_id)
-                        buffer = ""
+                        print(f"🎯 Sending TTS chunk ({len(display_buffer)} chars, sentences: {display_buffer.count('. ')})")
+                        await handle_tts_chunk(websocket, display_buffer, voice_id)
+                        display_buffer = ""
         
-        if not interrupt_flag["interrupted"] and len(buffer.strip()) > 5:
-            text = clean_text_for_tts(buffer.strip())
+        if not interrupt_flag["interrupted"] and len(display_buffer.strip()) > 5:
+            text = clean_text_for_tts(display_buffer.strip())
             if text and len(text) > 5:
                 await generate_and_send_audio(websocket, text, voice_id)
         

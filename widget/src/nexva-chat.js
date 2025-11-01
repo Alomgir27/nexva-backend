@@ -194,6 +194,11 @@ export const NexvaChat = {
   },
   
   startVoiceChat: function() {
+    if (this.currentMode === 'human') {
+      Messaging.addMessage('system', 'Voice chat is not available in human support mode. Please switch to AI mode first.');
+      return;
+    }
+    
     const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
     const voiceStatus = document.getElementById('nexvaVoiceStatus');
     
