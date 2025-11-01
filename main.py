@@ -134,6 +134,10 @@ class SupportMemberInvite(BaseModel):
     email: EmailStr
     name: str
 
+class AcceptInvitationRequest(BaseModel):
+    token: str
+    password: Optional[str] = None
+
 class SupportMemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -711,13 +715,12 @@ def invite_support_member(
 
 @app.post("/api/support/accept-invitation")
 def accept_support_invitation(
-    token: str,
-    password: Optional[str] = None,
+    request: AcceptInvitationRequest,
     db: Session = Depends(models.get_db)
 ):
     """Accept support team invitation. Creates account if user doesn't exist."""
     invitation = db.query(models.SupportTeamMember).filter(
-        models.SupportTeamMember.invitation_token == token
+        models.SupportTeamMember.invitation_token == request.token
     ).first()
     
     if not invitation:
@@ -732,13 +735,13 @@ def accept_support_invitation(
     user = db.query(models.User).filter(models.User.email == invitation.email).first()
     
     if not user:
-        if not password:
+        if not request.password:
             raise HTTPException(
                 status_code=400, 
                 detail="Password required for new account"
             )
         
-        user = auth_service.create_user(db, invitation.email, password)
+        user = auth_service.create_user(db, invitation.email, request.password)
     
     invitation.status = "active"
     invitation.accepted_at = datetime.utcnow()
