@@ -54,7 +54,6 @@ class WebScraper:
                 options.add_argument('--disable-software-rasterizer')
                 options.add_argument('--disable-images')
                 options.add_argument('--blink-settings=imagesEnabled=false')
-                options.add_argument('--disable-javascript')
                 options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
                 options.page_load_strategy = 'normal'
                 self._driver_options = options

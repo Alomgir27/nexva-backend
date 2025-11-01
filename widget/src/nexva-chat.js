@@ -262,9 +262,11 @@ export const NexvaChat = {
         WebSocketManager.queueAudio(audioBlob);
       } else if (data.type === "response_end") {
         Messaging.finalizeMessage();
-        isSending = false;
         if (this.voiceChatActive && WebSocketManager.onResponseComplete) {
+          isSending = false;
           WebSocketManager.onResponseComplete();
+        } else {
+          isSending = false;
         }
       } else if (data.type === "error") {
         Messaging.addMessage('system', `❌ ${data.message}`);
