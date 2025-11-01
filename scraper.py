@@ -394,6 +394,7 @@ class WebScraper:
         iteration_count = 0
         consecutive_failures = 0
         max_consecutive_failures = 10
+        landing_page_url = self._normalize_url(start_url)
         
         try:
             while to_visit and len(scraped_pages) < self.max_pages and iteration_count < max_iterations:
@@ -478,10 +479,10 @@ class WebScraper:
                     media_urls = []
                     media_transcriptions = []
 
-                    if self.process_media:
+                    if self.process_media and normalized_url == landing_page_url:
                         media_files = self._extract_media_urls(soup, url)
                         if media_files:
-                            print(f"🎬 Found {len(media_files)} media file(s) on {url}")
+                            print(f"🎬 Found {len(media_files)} media file(s) on landing page: {url}")
                         media_urls = [m['url'] for m in media_files]
 
                         for idx, media in enumerate(media_files, 1):
