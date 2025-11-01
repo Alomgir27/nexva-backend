@@ -13,6 +13,9 @@ export const VoiceChat = {
   isSpeaking: false,
   onInterrupt: null,
   interruptSent: false,
+  assistantSpeaking: false,
+  pendingTranscript: '',
+  assistantTranscript: '',
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -37,10 +40,30 @@ export const VoiceChat = {
     this.recognition.lang = 'en-US';
     
     this.finalTranscript = '';
+    this.pendingTranscript = '';
+    this.assistantTranscript = '';
     this.currentMessageIndex = -1;
     this.messageSent = false;
     this.interruptSent = false;
     
+    const flushTranscript = () => {
+      if (this.messageSent) return;
+      const textToSend = this.pendingTranscript.trim();
+      if (!textToSend) return;
+      this.messageSent = true;
+      if (this.currentMessageIndex >= 0) {
+        this.updateUserMessage(textToSend);
+      }
+      onTranscript(textToSend);
+      this.pendingTranscript = '';
+      this.finalTranscript = '';
+      if (this.recognition) {
+        try {
+          this.recognition.stop();
+        } catch (e) {}
+      }
+    };
+
     this.recognition.onstart = () => {
       this.isRecording = true;
       document.getElementById('nexvaVoiceIndicator').classList.add('active');
@@ -69,8 +92,24 @@ export const VoiceChat = {
       }
       
       const displayText = this.finalTranscript + (interimTranscript ? ' ' + interimTranscript : '');
-      
-      if (displayText.trim() && this.currentMessageIndex < 0) {
+      const trimmedText = displayText.trim();
+
+      if (this.assistantSpeaking) {
+        const lowerText = trimmedText.toLowerCase();
+        const lowerAssistant = this.assistantTranscript.toLowerCase();
+        if (lowerText && lowerAssistant && lowerAssistant.includes(lowerText)) {
+          this.pendingTranscript = '';
+          if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = null;
+          }
+          return;
+        }
+      }
+
+      this.pendingTranscript = trimmedText;
+
+      if (trimmedText && this.currentMessageIndex < 0) {
         const container = document.getElementById('nexvaChatMessages');
         Messaging.addMessage('user', '');
         const messages = container.querySelectorAll('.nexva-chat-message.user');
@@ -79,7 +118,7 @@ export const VoiceChat = {
       
       this.updateUserMessage(displayText);
       
-      if (displayText.trim()) {
+      if (trimmedText) {
         if (!this.isSpeaking) {
           this.isSpeaking = true;
           this.updateMicrophoneColor(true);
@@ -93,33 +132,21 @@ export const VoiceChat = {
       
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
       
-      if (displayText.trim() && !this.messageSent) {
+      if (trimmedText && !this.messageSent) {
         this.silenceTimer = setTimeout(() => {
-          if (this.messageSent) return;
-          
-          const textToSend = (this.finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
-          if (textToSend) {
-            this.messageSent = true;
-            this.updateUserMessage(textToSend);
-            onTranscript(textToSend);
-            this.finalTranscript = '';
-            
-            if (this.recognition) {
-              this.recognition.stop();
-            }
-          }
+          flushTranscript();
         }, 2000);
       }
     };
     
     this.recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        if (this.currentMessageIndex >= 0) {
-          this.removeUserMessage();
-        }
-        Messaging.addMessage('system', '❌ Voice recognition error. Please try again.');
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
       }
+      if (this.currentMessageIndex >= 0) {
+        this.removeUserMessage();
+      }
+      Messaging.addMessage('system', '❌ Voice recognition error. Please try again.');
       this.cleanup();
     };
     
@@ -129,8 +156,13 @@ export const VoiceChat = {
         this.silenceTimer = null;
       }
       
+      if (!this.messageSent) {
+        flushTranscript();
+      }
+
       this.isRecording = false;
       this.finalTranscript = '';
+      this.pendingTranscript = '';
       this.currentMessageIndex = -1;
       this.messageSent = false;
       this.isSpeaking = false;
@@ -225,6 +257,24 @@ export const VoiceChat = {
     }
   },
   
+  setAssistantSpeaking: function(isSpeaking) {
+    this.assistantSpeaking = isSpeaking;
+    if (isSpeaking) {
+      this.interruptSent = false;
+    } else {
+      this.clearAssistantTranscript();
+    }
+  },
+  
+  addAssistantTranscriptChunk: function(text) {
+    if (!text) return;
+    this.assistantTranscript = (this.assistantTranscript + text).slice(-500);
+  },
+  
+  clearAssistantTranscript: function() {
+    this.assistantTranscript = '';
+  },
+  
   stop: function() {
     this.continuousMode = false;
     if (this.currentMessageIndex >= 0) {
@@ -246,8 +296,11 @@ export const VoiceChat = {
     }
     this.isRecording = false;
     this.finalTranscript = '';
+    this.pendingTranscript = '';
+    this.assistantTranscript = '';
     this.currentMessageIndex = -1;
     this.messageSent = false;
+    this.assistantSpeaking = false;
     const indicator = document.getElementById('nexvaVoiceIndicator');
     if (indicator) {
       indicator.classList.remove('active');

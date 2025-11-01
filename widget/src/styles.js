@@ -78,10 +78,10 @@ export const Styles = {
         color: ${primaryColor};
         flex-shrink: 0;
       }
-      .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: 400px; height: 650px; max-height: calc(100vh - 120px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 0.5px solid ${borderColor}; }
+      .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: min(400px, calc(100vw - 40px)); height: min(650px, calc(100vh - 120px)); max-height: calc(100vh - 120px); max-width: calc(100vw - 40px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 0.5px solid ${borderColor}; }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }
-      .nexva-chat-window.docked { width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; right: 0; left: auto; border-right: none; border-top: none; border-bottom: none; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15); animation: slideInRight 0.3s ease; }
+      .nexva-chat-window.docked { width: min(380px, calc(100vw - 20px)); height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; right: 0; left: auto; border-right: none; border-top: none; border-bottom: none; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15); animation: slideInRight 0.3s ease; }
       @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
       .nexva-chat-header { background: ${bgSecondary}; color: ${textDefault}; border-bottom: 1px solid ${borderColor}; flex-shrink: 0; }

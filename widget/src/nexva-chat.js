@@ -17,29 +17,21 @@ export const NexvaChat = {
   notificationAudio: null,
   
   init: function(apiKey, options) {
-    console.log('[Nexva] Initializing widget...', { apiKey, options });
-    
     // Prevent double initialization
     if (this.initialized) {
-      console.warn('[Nexva] Widget already initialized, skipping...');
       return;
     }
     
     // Remove any existing widget
     const existingContainer = document.querySelector('.nexva-chat-container');
     if (existingContainer) {
-      console.log('[Nexva] Removing existing widget...');
       existingContainer.remove();
     }
     
     this.config = Config.init(apiKey, options);
-    console.log('[Nexva] Config initialized:', this.config);
     Styles.inject(this.config);
-    console.log('[Nexva] Styles injected');
     UI.createWidget(this.config);
-    console.log('[Nexva] Widget created');
     this.attachEventListeners();
-    console.log('[Nexva] Event listeners attached');
     
     // Initialize notification audio
     const audioPath = `${this.config.apiUrl}/notifications.wav`;
@@ -51,7 +43,6 @@ export const NexvaChat = {
     if (this.config.autoOpen) {
       setTimeout(() => this.openChat(), 1000);
     }
-    console.log('[Nexva] Widget initialization complete');
   },
   
   attachEventListeners: function() {
@@ -64,16 +55,10 @@ export const NexvaChat = {
     const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
     const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
     
-    console.log('[Nexva] Attaching event listeners...');
-    console.log('[Nexva] Button element:', button);
-    
     if (button) {
       button.addEventListener('click', () => {
-        console.log('[Nexva] Button clicked! Current isOpen:', this.isOpen);
         this.toggleChat();
       });
-    } else {
-      console.error('[Nexva] Chat button not found!');
     }
     
     if (closeBtn) {
@@ -135,8 +120,6 @@ export const NexvaChat = {
         }
       });
     });
-    
-    console.log('[Nexva] Event listeners attached successfully');
   },
   
   switchTab: function(tab) {
@@ -255,13 +238,16 @@ export const NexvaChat = {
       
       if (data.type === "response_start") {
         VoiceChat.interruptSent = false;
+        VoiceChat.clearAssistantTranscript();
       } else if (data.type === "text_chunk") {
+        VoiceChat.addAssistantTranscriptChunk(data.text);
         Messaging.appendToLastMessage(data.text);
       } else if (data.type === "audio_chunk") {
         const audioBlob = new Blob([Uint8Array.from(atob(data.audio), c => c.charCodeAt(0))], { type: 'audio/wav' });
         WebSocketManager.queueAudio(audioBlob);
       } else if (data.type === "response_end") {
         Messaging.finalizeMessage();
+        VoiceChat.clearAssistantTranscript();
         if (this.voiceChatActive && WebSocketManager.onResponseComplete) {
           isSending = false;
           WebSocketManager.onResponseComplete();
@@ -313,12 +299,10 @@ export const NexvaChat = {
   },
   
   toggleChat: function() {
-    console.log('[Nexva] toggleChat called, isOpen:', this.isOpen);
     this.isOpen ? this.closeChat() : this.openChat();
   },
   
   openChat: function() {
-    console.log('[Nexva] openChat called');
     this.isOpen = true;
     this.hideNotification();
     UI.toggleChat(true);
@@ -326,7 +310,6 @@ export const NexvaChat = {
     const existingConversationId = Utils.getConversationId(this.config.apiKey);
     if (existingConversationId) {
       this.conversationId = existingConversationId;
-      console.log('[Nexva] Resuming conversation:', existingConversationId);
     }
     
     WebSocketManager.connect(this.config, (convId, mode) => {
@@ -350,20 +333,15 @@ export const NexvaChat = {
     };
     
     this.updateActions();
-    console.log('[Nexva] Chat opened, isOpen:', this.isOpen);
   },
   
   switchMode: function(mode) {
-    console.log('[Nexva] switchMode called, mode:', mode, 'conversationId:', this.conversationId);
-    
     // Check if human support is enabled
     if (!this.config.enableHumanSupport) {
-      console.log('[Nexva] Human support is disabled in config');
       return;
     }
     
     if (mode === this.currentMode) {
-      console.log('[Nexva] Already in mode:', mode);
       return;
     }
     
@@ -371,8 +349,6 @@ export const NexvaChat = {
     if (!this.conversationId) {
       this.currentMode = mode;
       UI.updateMode(mode);
-      const modeText = mode === 'ai' ? 'AI Assistant' : 'Human Support';
-      console.log('[Nexva] Mode set to:', modeText, '(conversation not started yet)');
       return;
     }
     
@@ -382,8 +358,6 @@ export const NexvaChat = {
     
     Messaging.addMessage('system', switchMessage);
     
-    console.log('[Nexva] Sending mode switch request to:', `${this.config.apiUrl}/api/conversations/${this.conversationId}/switch-mode`);
-    
     fetch(`${this.config.apiUrl}/api/conversations/${this.conversationId}/switch-mode`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -391,7 +365,6 @@ export const NexvaChat = {
     })
     .then(res => res.json())
     .then(data => {
-      console.log('[Nexva] Mode switch response:', data);
       this.currentMode = mode;
       UI.updateMode(mode);
       const successMsg = mode === 'human'
@@ -401,7 +374,6 @@ export const NexvaChat = {
       this.updateActions();
     })
     .catch((error) => {
-      console.error('[Nexva] Mode switch error:', error);
       Messaging.addMessage('system', '❌ Failed to switch mode. Please try again.');
     });
   },
@@ -514,9 +486,7 @@ export const NexvaChat = {
   playNotificationSound: function() {
     if (this.notificationAudio) {
       this.notificationAudio.currentTime = 0;
-      this.notificationAudio.play().catch(err => {
-        console.log('[Nexva] Notification sound blocked:', err);
-      });
+      this.notificationAudio.play().catch(() => {});
     }
   }
 };

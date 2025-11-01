@@ -27,13 +27,11 @@ export const WebSocketManager = {
     }
     
     this.ws.onopen = () => {
-      console.log('[WebSocket] Connected to server');
       const initMessage = {
         session_id: this.sessionId
       };
       if (existingConversationId) {
         initMessage.conversation_id = existingConversationId;
-        console.log('[WebSocket] Resuming conversation:', existingConversationId);
       }
       this.ws.send(JSON.stringify(initMessage));
     };
@@ -54,6 +52,7 @@ export const WebSocketManager = {
           onConversationUpdate(this.conversationId, data.mode);
         }
       } else if (data.type === 'chunk') {
+        VoiceChat.addAssistantTranscriptChunk(data.text);
         Messaging.appendToLastMessage(data.text);
       } else if (data.type === 'complete') {
         Messaging.finalizeMessage();
@@ -67,14 +66,12 @@ export const WebSocketManager = {
           this.onResponseComplete();
         }
       } else if (data.type === 'human_message') {
-        console.log('[WebSocket] ✅ Received human message:', data.content.substring(0, 50));
         Messaging.addHumanMessage(data.content, data.sender_email);
         
         if (this.onSupportMessage) {
           this.onSupportMessage();
         }
       } else if (data.type === 'ticket_resolved') {
-        console.log('[WebSocket] Ticket resolved, switching to AI mode');
         Messaging.addMessage('system', '✅ ' + data.message);
         if (onConversationUpdate) {
           onConversationUpdate(this.conversationId, 'ai');
@@ -83,11 +80,12 @@ export const WebSocketManager = {
     };
     
     this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
       Messaging.addMessage('system', '❌ Connection error. Please try again.');
     };
     
-    this.ws.onclose = () => console.log('WebSocket closed');
+    this.ws.onclose = () => {
+      this.ws = null;
+    };
   },
   
   sendMessage: function(message) {
@@ -149,13 +147,13 @@ export const WebSocketManager = {
     };
     
     audio.play().catch(err => {
-      console.error('Audio play failed:', err);
       URL.revokeObjectURL(url);
       this.playNextAudio();
     });
   },
   
   updatePlaybackStatus: function(isPlaying) {
+    VoiceChat.setAssistantSpeaking(isPlaying);
     const voiceStatus = document.getElementById('nexvaVoiceStatus');
     if (voiceStatus) {
       if (isPlaying) {
@@ -170,17 +168,34 @@ export const WebSocketManager = {
   
   stopAllAudio: function() {
     if (this.currentAudio) {
-      this.currentAudio.pause();
+      try {
+        this.currentAudio.pause();
+      } catch (e) {}
+      const currentSrc = this.currentAudio.src;
+      this.currentAudio.src = '';
+      if (currentSrc && currentSrc.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(currentSrc);
+        } catch (e) {}
+      }
       this.currentAudio = null;
     }
     
     this.audioQueue.forEach(({audio, url}) => {
-      audio.pause();
-      URL.revokeObjectURL(url);
+      try {
+        audio.pause();
+        audio.src = '';
+      } catch (e) {}
+      if (url && url.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (err) {}
+      }
     });
     this.audioQueue = [];
     this.isPlayingAudio = false;
     this.updatePlaybackStatus(false);
+    VoiceChat.clearAssistantTranscript();
   }
 };
 

@@ -137,21 +137,15 @@ export const UI = {
   
   toggleChat: function(isOpen) {
     const window = document.getElementById('nexvaChatWindow');
-    console.log('[Nexva UI] toggleChat called, isOpen:', isOpen);
-    console.log('[Nexva UI] Window element:', window);
     
     if (window) {
       if (isOpen) {
         window.classList.add('open');
         const input = document.getElementById('nexvaChatInput');
         if (input) input.focus();
-        console.log('[Nexva UI] Window opened, classes:', window.className);
       } else {
         window.classList.remove('open');
-        console.log('[Nexva UI] Window closed');
       }
-    } else {
-      console.error('[Nexva UI] Chat window element not found!');
     }
   },
   

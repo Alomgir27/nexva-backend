@@ -55,7 +55,7 @@ export const Messaging = {
         container.scrollTop = newScrollHeight - oldScrollHeight;
       }
     } catch (error) {
-      console.error('Error loading messages:', error);
+      // Error loading messages
     } finally {
       this.hideLoadingIndicator();
       this.isLoadingMore = false;
@@ -271,7 +271,7 @@ export const Messaging = {
         button.style.color = '';
       }, 2000);
     }).catch(err => {
-      console.error('Copy failed:', err);
+      // Copy failed silently
     });
   },
   
