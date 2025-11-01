@@ -228,6 +228,13 @@ export const NexvaChat = {
         isSending = false;
       };
       
+      // Set restart callback for mobile
+      VoiceChat.restartCallback = () => {
+        VoiceChat.start((transcript) => {
+          trySendTranscript(transcript);
+        }, true);
+      };
+      
       VoiceChat.start((transcript) => {
         trySendTranscript(transcript);
       }, true);

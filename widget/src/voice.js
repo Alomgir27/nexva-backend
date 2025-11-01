@@ -16,6 +16,8 @@ export const VoiceChat = {
   assistantSpeaking: false,
   pendingTranscript: '',
   assistantTranscript: '',
+  needsRestart: false,
+  restartCallback: null,
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -160,6 +162,7 @@ export const VoiceChat = {
         flushTranscript();
       }
 
+      const wasRecording = this.isRecording;
       this.isRecording = false;
       this.finalTranscript = '';
       this.pendingTranscript = '';
@@ -175,6 +178,15 @@ export const VoiceChat = {
       }
       
       UI.animateHeaderTitle(false, this.originalHeaderTitle);
+      
+      // Auto-restart recognition if in continuous mode
+      if (this.continuousMode && wasRecording && !this.assistantSpeaking) {
+        setTimeout(() => {
+          if (this.continuousMode && !this.assistantSpeaking && this.restartCallback) {
+            this.restartCallback();
+          }
+        }, 800);
+      }
     };
     
     this.recognition.start();
@@ -259,8 +271,11 @@ export const VoiceChat = {
   
   setAssistantSpeaking: function(isSpeaking) {
     this.assistantSpeaking = isSpeaking;
+    
     if (isSpeaking) {
       this.interruptSent = false;
+      // Keep recognition running so user can interrupt by speaking
+      // Don't stop recognition anymore - allow interruption
     } else {
       this.clearAssistantTranscript();
     }
@@ -301,6 +316,8 @@ export const VoiceChat = {
     this.currentMessageIndex = -1;
     this.messageSent = false;
     this.assistantSpeaking = false;
+    this.needsRestart = false;
+    this.restartCallback = null;
     const indicator = document.getElementById('nexvaVoiceIndicator');
     if (indicator) {
       indicator.classList.remove('active');
