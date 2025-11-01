@@ -23,7 +23,7 @@ _DRIVER_PATH_LOCK = Lock()
 
 
 class WebScraper:
-    def __init__(self, max_pages: int = 1000, process_media: Optional[bool] = None):
+    def __init__(self, max_pages: int = 500, process_media: Optional[bool] = None):
         self.max_pages = max_pages
         self.visited = set()
         self.failed_attempts = {}
@@ -51,6 +51,10 @@ class WebScraper:
                 options.add_argument('--disable-extensions')
                 options.add_argument('--disable-logging')
                 options.add_argument('--log-level=3')
+                options.add_argument('--disable-software-rasterizer')
+                options.add_argument('--disable-images')
+                options.add_argument('--blink-settings=imagesEnabled=false')
+                options.add_argument('--disable-javascript')
                 options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
                 options.page_load_strategy = 'normal'
                 self._driver_options = options
@@ -402,7 +406,7 @@ class WebScraper:
                 try:
                     try:
                         driver.get(url)
-                        time.sleep(1)
+                        time.sleep(0.5)
                     except Exception as load_error:
                         if 'timeout' in str(load_error).lower() and 'renderer' in str(load_error).lower():
                             print(f"⚠️ Renderer timeout on {url}, restarting driver...")
@@ -414,7 +418,7 @@ class WebScraper:
                     
                     try:
                         driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-                        time.sleep(0.5)
+                        time.sleep(0.3)
                         driver.execute_script("window.scrollTo(0, 0);")
                     except:
                         pass
@@ -482,12 +486,12 @@ class WebScraper:
                             last_updated=datetime.utcnow()
                         )
                         db.add(scraped_page)
-                        db.commit()
                         scraped_pages.append(scraped_page)
                         pages_batch.append((scraped_page, content_data, media_transcriptions))
                         
-                        domain.pages_scraped = len(scraped_pages)
-                        db.commit()
+                        if len(scraped_pages) % 5 == 0:
+                            domain.pages_scraped = len(scraped_pages)
+                            db.commit()
                         
                         consecutive_failures = 0
                         pages_since_driver_refresh += 1
@@ -535,6 +539,10 @@ class WebScraper:
         finally:
             if pages_batch:
                 self._batch_index_pages(pages_batch, chatbot_id, domain_id)
+            
+            if scraped_pages:
+                domain.pages_scraped = len(scraped_pages)
+                db.commit()
             
             self._cleanup_driver()
             gc.collect()

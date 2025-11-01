@@ -27,7 +27,7 @@ import secrets
 
 from neural_tts_service import neural_tts
 
-scrape_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="scraper")
+scrape_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="scraper")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,6 +120,7 @@ class DocumentResponse(BaseModel):
 
 class CheckoutSessionCreate(BaseModel):
     plan_tier: str
+    billing_period: str = 'monthly'
 
 class SubscriptionInfo(BaseModel):
     plan_tier: str
@@ -1163,11 +1164,14 @@ async def create_checkout_session(
     if session_data.plan_tier not in ['basic', 'pro', 'enterprise']:
         raise HTTPException(status_code=400, detail="Invalid plan tier")
     
-    success_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing?success=true'
-    cancel_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing?canceled=true'
+    if session_data.billing_period not in ['monthly', 'annual']:
+        raise HTTPException(status_code=400, detail="Invalid billing period")
+    
+    success_url = os.getenv('FRONTEND_URL', 'https://nexva.pages.dev') + '/dashboard/billing?success=true'
+    cancel_url = os.getenv('FRONTEND_URL', 'https://nexva.pages.dev') + '/dashboard/billing?canceled=true'
     
     result = stripe_service.create_checkout_session(
-        current_user, session_data.plan_tier, success_url, cancel_url, db
+        current_user, session_data.plan_tier, session_data.billing_period, success_url, cancel_url, db
     )
     
     if not result:
@@ -1182,7 +1186,7 @@ async def create_portal_session(
     if not current_user.stripe_customer_id:
         raise HTTPException(status_code=404, detail="No billing account found")
     
-    return_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/dashboard/billing'
+    return_url = os.getenv('FRONTEND_URL', 'https://nexva.pages.dev') + '/dashboard/billing'
     
     portal_url = stripe_service.create_portal_session(current_user.stripe_customer_id, return_url)
     

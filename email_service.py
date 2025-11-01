@@ -33,7 +33,7 @@ def send_email(to_email: str, subject: str, body: str, html_body: str = None):
         print(f"Email send failed: {e}")
 
 def send_support_invite(email: str, name: str, chatbot_name: str, invited_by: str, invitation_token: str):
-    FRONTEND_URL = "https://nexva.pages.dev"
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://nexva.pages.dev')
     accept_url = f"{FRONTEND_URL}/accept-invitation?token={invitation_token}"
     
     subject = f"Support Team Invitation - {chatbot_name}"
@@ -75,7 +75,7 @@ This link expires in 7 days.
     send_email(email, subject, body, html_body)
 
 def send_new_ticket_alert(support_emails: List[str], ticket_id: int, chatbot_name: str, user_message: str):
-    FRONTEND_URL = "https://nexva.pages.dev"
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://nexva.pages.dev')
     ticket_url = f"{FRONTEND_URL}/dashboard/support"
     
     subject = f"New Ticket #{ticket_id} - {chatbot_name}"

@@ -5,7 +5,9 @@ PLANS = {
         'name': 'Free',
         'chatbot_limit': 1,
         'price_monthly': 0,
-        'stripe_price_id': None,
+        'price_annual': 0,
+        'stripe_price_id_monthly': None,
+        'stripe_price_id_annual': None,
         'features': [
             '1 chatbot',
             'Unlimited domains',
@@ -17,8 +19,10 @@ PLANS = {
     'basic': {
         'name': 'Basic',
         'chatbot_limit': 5,
-        'price_monthly': 29,
-        'stripe_price_id': os.getenv('STRIPE_PRICE_ID_BASIC', 'price_basic'),
+        'price_monthly': 9.99,
+        'price_annual': 95.99,
+        'stripe_price_id_monthly': os.getenv('STRIPE_PRICE_ID_BASIC_MONTHLY', 'price_basic_monthly'),
+        'stripe_price_id_annual': os.getenv('STRIPE_PRICE_ID_BASIC_ANNUAL', 'price_basic_annual'),
         'features': [
             '5 chatbots',
             'Unlimited domains',
@@ -31,8 +35,10 @@ PLANS = {
     'pro': {
         'name': 'Pro',
         'chatbot_limit': 15,
-        'price_monthly': 79,
-        'stripe_price_id': os.getenv('STRIPE_PRICE_ID_PRO', 'price_pro'),
+        'price_monthly': 24.99,
+        'price_annual': 239.99,
+        'stripe_price_id_monthly': os.getenv('STRIPE_PRICE_ID_PRO_MONTHLY', 'price_pro_monthly'),
+        'stripe_price_id_annual': os.getenv('STRIPE_PRICE_ID_PRO_ANNUAL', 'price_pro_annual'),
         'features': [
             '15 chatbots',
             'Unlimited domains',
@@ -47,8 +53,10 @@ PLANS = {
     'enterprise': {
         'name': 'Enterprise',
         'chatbot_limit': -1,
-        'price_monthly': 199,
-        'stripe_price_id': os.getenv('STRIPE_PRICE_ID_ENTERPRISE', 'price_enterprise'),
+        'price_monthly': 49.99,
+        'price_annual': 479.99,
+        'stripe_price_id_monthly': os.getenv('STRIPE_PRICE_ID_ENTERPRISE_MONTHLY', 'price_enterprise_monthly'),
+        'stripe_price_id_annual': os.getenv('STRIPE_PRICE_ID_ENTERPRISE_ANNUAL', 'price_enterprise_annual'),
         'features': [
             'Unlimited chatbots',
             'Unlimited domains',

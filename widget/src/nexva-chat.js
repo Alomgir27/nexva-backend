@@ -110,12 +110,11 @@ export const NexvaChat = {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
     
-    const modeIcon = document.getElementById('nexvaModeIcon');
-    if (modeIcon && this.config.enableHumanSupport) {
-      modeIcon.addEventListener('click', () => {
-        const newMode = this.currentMode === 'ai' ? 'human' : 'ai';
-        this.switchMode(newMode);
-      });
+    const modeBtnAI = document.getElementById('nexvaModeBtnAI');
+    const modeBtnHuman = document.getElementById('nexvaModeBtnHuman');
+    if (modeBtnAI && modeBtnHuman && this.config.enableHumanSupport) {
+      modeBtnAI.addEventListener('click', () => this.switchMode('ai'));
+      modeBtnHuman.addEventListener('click', () => this.switchMode('human'));
     }
     
     // Preset questions click handlers

@@ -78,7 +78,7 @@ export const Styles = {
         color: ${primaryColor};
         flex-shrink: 0;
       }
-      .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: 400px; height: 650px; max-height: calc(100vh - 120px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 1px solid ${borderColor}; }
+      .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: 400px; height: 650px; max-height: calc(100vh - 120px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 0.5px solid ${borderColor}; }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }
       .nexva-chat-window.docked { width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; right: 0; left: auto; border-right: none; border-top: none; border-bottom: none; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15); animation: slideInRight 0.3s ease; }
@@ -100,41 +100,46 @@ export const Styles = {
         flex: 1;
         display: flex;
         align-items: center;
-        padding: 0 12px;
+        justify-content: center;
+        padding: 8px 12px;
         background: ${bgOverlay};
         border-left: 1px solid ${borderColor};
       }
-      .nexva-mode-input-wrapper { 
+      .nexva-mode-toggle {
+        display: flex;
+        gap: 4px;
+        background: ${bgBase};
+        border-radius: 6px;
+        padding: 2px;
+        border: 1px solid ${borderColor};
+      }
+      .nexva-mode-btn {
         display: flex;
         align-items: center;
-        gap: 6px;
-        width: 100%;
-      }
-      .nexva-mode-icon {
-        width: 18px;
-        height: 18px;
-        color: ${primaryColor};
+        gap: 4px;
+        padding: 6px 12px;
+        border: none;
+        background: transparent;
+        color: ${textSecondary};
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 4px;
         cursor: pointer;
         transition: all 0.2s ease;
-        flex-shrink: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
-      .nexva-mode-icon:hover { 
-        transform: scale(1.1);
-        color: ${hoverColor};
+      .nexva-mode-btn svg {
+        width: 14px;
+        height: 14px;
       }
-      .nexva-mode-input { 
-        flex: 1;
-        height: 24px;
-        background: ${bgBase};
-        border: 1px solid ${borderColor};
-        border-radius: 0;
+      .nexva-mode-btn:hover {
         color: ${textDefault};
-        font-size: 11px;
-        font-weight: 500;
-        padding: 0 6px;
-        cursor: default;
-        outline: none;
-        pointer-events: none;
+        background: ${bgOverlay};
+      }
+      .nexva-mode-btn.active {
+        background: ${primaryColor};
+        color: ${userMessageText};
       }
       .nexva-chat-icon-btn { background: transparent; border: none; color: ${textSecondary}; cursor: pointer; padding: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; opacity: 0.7; }
       .nexva-chat-icon-btn:hover { color: ${textDefault}; opacity: 1; background: rgba(255, 255, 255, 0.03); }
@@ -161,6 +166,7 @@ export const Styles = {
         gap: 8px;
         margin-top: 16px;
         padding-bottom: 8px;
+        justify-content: flex-end;
       }
       .nexva-preset-question-btn {
         background: ${bgSecondary};

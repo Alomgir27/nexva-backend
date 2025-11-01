@@ -17,10 +17,14 @@ def create_customer(email: str, user_id: int) -> Optional[str]:
         print(f"Error creating Stripe customer: {e}")
         return None
 
-def create_checkout_session(user: models.User, plan_tier: str, success_url: str, cancel_url: str, db) -> Optional[Dict]:
+def create_checkout_session(user: models.User, plan_tier: str, billing_period: str, success_url: str, cancel_url: str, db) -> Optional[Dict]:
     try:
         plan = PLANS.get(plan_tier)
-        if not plan or not plan['stripe_price_id']:
+        if not plan:
+            return None
+        
+        price_id = plan.get(f'stripe_price_id_{billing_period}')
+        if not price_id:
             return None
         
         if not user.stripe_customer_id:
@@ -38,7 +42,7 @@ def create_checkout_session(user: models.User, plan_tier: str, success_url: str,
             customer=customer_id,
             payment_method_types=['card'],
             line_items=[{
-                'price': plan['stripe_price_id'],
+                'price': price_id,
                 'quantity': 1,
             }],
             mode='subscription',
@@ -46,7 +50,8 @@ def create_checkout_session(user: models.User, plan_tier: str, success_url: str,
             cancel_url=cancel_url,
             metadata={
                 'user_id': user.id,
-                'plan_tier': plan_tier
+                'plan_tier': plan_tier,
+                'billing_period': billing_period
             }
         )
         
@@ -239,7 +244,7 @@ def handle_invoice_payment_failed(invoice_data: Dict, db):
 
 def get_plan_tier_from_price_id(price_id: str) -> str:
     for tier, plan in PLANS.items():
-        if plan.get('stripe_price_id') == price_id:
+        if plan.get('stripe_price_id_monthly') == price_id or plan.get('stripe_price_id_annual') == price_id:
             return tier
     return 'free'
 
