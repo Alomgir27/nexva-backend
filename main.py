@@ -407,8 +407,7 @@ def delete_domain(
     
     documents = db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).all()
     for doc in documents:
-        if os.path.exists(doc.file_path):
-            os.remove(doc.file_path)
+        r2_service.delete_file(doc.r2_key)
         document_service.delete_document_from_index(chatbot.id, doc.id)
     db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain_id).delete()
     
