@@ -103,7 +103,6 @@ export const VoiceChat = {
             this.updateUserMessage(textToSend);
             onTranscript(textToSend);
             this.finalTranscript = '';
-            this.currentMessageIndex = -1;
             
             if (this.recognition) {
               this.recognition.stop();
@@ -228,10 +227,10 @@ export const VoiceChat = {
   
   stop: function() {
     this.continuousMode = false;
-    this.cleanup();
     if (this.currentMessageIndex >= 0) {
       this.removeUserMessage();
     }
+    this.cleanup();
   },
   
   cleanup: function() {

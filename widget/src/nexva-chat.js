@@ -211,42 +211,42 @@ export const NexvaChat = {
     this.voiceChatWs = new WebSocket(`${protocol}//${host}/ws/voice-chat/${this.config.apiKey}`);
     
     let isSending = false;
+    const trySendTranscript = (rawTranscript) => {
+      const transcript = (rawTranscript || '').trim();
+      if (!transcript || !this.voiceChatWs || this.voiceChatWs.readyState !== WebSocket.OPEN || isSending) {
+        return;
+      }
+      isSending = true;
+      Messaging.showTyping();
+      this.voiceChatWs.send(JSON.stringify({
+        type: "text_query",
+        text: transcript
+      }));
+    };
     
     this.voiceChatWs.onopen = () => {
       WebSocketManager.onResponseComplete = () => {
         if (this.voiceChatActive && VoiceChat.continuousMode) {
           setTimeout(() => {
             VoiceChat.start((transcript) => {
-              if (this.voiceChatWs.readyState === WebSocket.OPEN && !isSending) {
-                isSending = true;
-                Messaging.showTyping();
-                this.voiceChatWs.send(JSON.stringify({
-                  type: "text_query",
-                  text: transcript
-                }));
-              }
+              trySendTranscript(transcript);
             }, true);
           }, 500);
         }
       };
       
-            VoiceChat.onInterrupt = () => {
-              if (this.voiceChatWs && this.voiceChatWs.readyState === WebSocket.OPEN) {
-                this.voiceChatWs.send(JSON.stringify({ type: 'interrupt' }));
-              }
-              WebSocketManager.stopAllAudio();
-              Messaging.hideTyping();
-            };
+      VoiceChat.onInterrupt = () => {
+        if (this.voiceChatWs && this.voiceChatWs.readyState === WebSocket.OPEN) {
+          this.voiceChatWs.send(JSON.stringify({ type: 'interrupt' }));
+        }
+        WebSocketManager.stopAllAudio();
+        Messaging.hideTyping();
+        Messaging.finalizeMessage();
+        isSending = false;
+      };
       
       VoiceChat.start((transcript) => {
-        if (this.voiceChatWs.readyState === WebSocket.OPEN && !isSending) {
-          isSending = true;
-          Messaging.showTyping();
-          this.voiceChatWs.send(JSON.stringify({
-            type: "text_query",
-            text: transcript
-          }));
-        }
+        trySendTranscript(transcript);
       }, true);
     };
     
