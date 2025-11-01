@@ -28,3 +28,5 @@ faster-whisper
 PyPDF2
 python-docx
 stripe
+boto3
+python-dotenv

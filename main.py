@@ -25,10 +25,11 @@ import asyncio
 import os
 import shutil
 import secrets
+from r2_service import r2_service
 
 from neural_tts_service import neural_tts
 
-scrape_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="scraper")
+scrape_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="scraper")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,8 +39,9 @@ async def lifespan(app: FastAPI):
     search.get_embedding_model()
     print("✅ All models loaded and ready")
     yield
-    print("🛑 Shutting down scraper threads...")
+    print("🛑 Shutting down...")
     scrape_executor.shutdown(wait=False)
+    await chat_service.chat_service.close()
     print("✅ Cleanup complete")
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)
@@ -111,6 +113,7 @@ class DocumentResponse(BaseModel):
     id: int
     domain_id: int
     filename: str
+    r2_url: str
     file_type: str
     file_size: int
     title: Optional[str]
@@ -435,19 +438,28 @@ async def upload_document(
     if file.content_type not in allowed_types and not any(file.filename.endswith(ext) for ext in ['.pdf', '.docx', '.txt']):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF, DOCX, and TXT are allowed")
     
-    upload_dir = f"uploads/documents/{domain_id}"
-    os.makedirs(upload_dir, exist_ok=True)
+    temp_dir = "/tmp/documents"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, file.filename)
     
-    file_path = os.path.join(upload_dir, file.filename)
-    with open(file_path, "wb") as buffer:
+    with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    file_size = os.path.getsize(file_path)
+    file_size = os.path.getsize(temp_path)
+    
+    r2_key = r2_service.generate_file_path(domain_id, file.filename)
+    content_type = r2_service._get_content_type(file.filename)
+    upload_result = r2_service.upload_file(temp_path, r2_key, content_type)
+    
+    if not upload_result["success"]:
+        os.remove(temp_path)
+        raise HTTPException(status_code=500, detail=f"Failed to upload to R2: {upload_result.get('error')}")
     
     document = models.DomainDocument(
         domain_id=domain_id,
         filename=file.filename,
-        file_path=file_path,
+        r2_key=r2_key,
+        r2_url=upload_result["url"],
         file_type=file.content_type or 'application/octet-stream',
         file_size=file_size,
         status='processing'
@@ -456,12 +468,14 @@ async def upload_document(
     db.commit()
     db.refresh(document)
     
-    success = document_service.process_document(document.id, file_path, file.content_type, chatbot.id, domain_id, db)
+    success = document_service.process_document(document.id, temp_path, file.content_type, chatbot.id, domain_id, db)
+    
+    os.remove(temp_path)
+    
     if not success:
+        r2_service.delete_file(r2_key)
         db.delete(document)
         db.commit()
-        if os.path.exists(file_path):
-            os.remove(file_path)
         raise HTTPException(status_code=500, detail="Failed to process document")
     
     db.refresh(document)
@@ -522,10 +536,8 @@ def download_document(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Not authorized")
     
-    if not os.path.exists(document.file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(document.file_path, filename=document.filename)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=document.r2_url)
 
 @app.delete("/api/documents/{document_id}")
 def delete_document(
@@ -548,9 +560,7 @@ def delete_document(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Not authorized")
     
-    if os.path.exists(document.file_path):
-        os.remove(document.file_path)
-    
+    r2_service.delete_file(document.r2_key)
     document_service.delete_document_from_index(chatbot.id, document.id)
     
     db.delete(document)

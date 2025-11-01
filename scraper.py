@@ -122,10 +122,11 @@ class WebScraper:
                 self.driver = None
                 if hasattr(self, '_remote_debugging_port'):
                     self._release_port(self._remote_debugging_port)
-                
+        
         try:
             import subprocess
-            subprocess.run(['pkill', '-f', 'chrome'], capture_output=True, timeout=5)
+            subprocess.run(['pkill', '-9', '-f', 'chrome.*--headless'], capture_output=True, timeout=3)
+            time.sleep(1)
         except:
             pass
 
@@ -531,11 +532,12 @@ class WebScraper:
                         pages_since_driver_refresh += 1
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
                         
-                        if pages_since_driver_refresh >= 10:
-                            print("🔄 Refreshing driver after 10 pages...")
+                        if pages_since_driver_refresh >= 25:
+                            print("🔄 Refreshing driver after 25 pages...")
                             try:
                                 driver = self._restart_driver()
                                 pages_since_driver_refresh = 0
+                                time.sleep(2)
                             except Exception as restart_error:
                                 print(f"⚠️ Driver restart failed: {restart_error}")
                                 driver = self._get_driver()
@@ -569,16 +571,20 @@ class WebScraper:
                     
                     if any(keyword in error_msg for keyword in ['connection refused', 'connection aborted', 'remote end closed']):
                         print(f"⚠️ Driver crashed, restarting...")
-                        try:
-                            driver = self._restart_driver()
-                            pages_since_driver_refresh = 0
-                            consecutive_failures = 0
-                            to_visit.insert(0, url)
-                            self.visited.discard(normalized_url)
-                            continue
-                        except Exception as restart_error:
-                            print(f"❌ Failed to restart driver: {restart_error}")
-                            consecutive_failures += 1
+                        consecutive_failures += 1
+                        
+                        if consecutive_failures < max_consecutive_failures:
+                            try:
+                                time.sleep(2)
+                                driver = self._restart_driver()
+                                pages_since_driver_refresh = 0
+                                time.sleep(2)
+                                to_visit.insert(0, url)
+                                self.visited.discard(normalized_url)
+                                continue
+                            except Exception as restart_error:
+                                print(f"❌ Failed to restart driver: {restart_error}")
+                                consecutive_failures += 1
                     
                     if any(keyword in error_msg for keyword in ['timeout', 'refused', 'unreachable', '403', '429', 'blocked']):
                         print(f"⚠️ Site appears to be blocking requests")

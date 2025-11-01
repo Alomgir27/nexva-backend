@@ -72,11 +72,15 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
     
     await websocket.accept()
     
-    data = await websocket.receive_text()
-    init_data = json.loads(data)
+    conversation_id = None
+    session_id = None
     
-    session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
-    conversation_id = init_data.get('conversation_id')
+    try:
+        data = await websocket.receive_text()
+        init_data = json.loads(data)
+        
+        session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
+        conversation_id = init_data.get('conversation_id')
     
     conversation = None
     history = []
@@ -160,6 +164,9 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             
             history.append({'role': 'user', 'content': user_message})
             
+            if len(history) > 20:
+                history = history[-20:]
+            
             full_response = ""
             async for chunk in chat_service.chat_service.stream_chat(chatbot.id, user_message, history):
                 full_response += chunk
@@ -176,6 +183,9 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             
             history.append({'role': 'assistant', 'content': full_response})
             
+            if len(history) > 20:
+                history = history[-20:]
+            
             db_response = models.Message(
                 conversation_id=conversation.id,
                 role='assistant',
@@ -185,12 +195,12 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             db.commit()
     
     except WebSocketDisconnect:
-        if conversation.id in manager.conversation_connections:
-            del manager.conversation_connections[conversation.id]
+        pass
     except Exception as e:
         print(f"WebSocket error: {e}")
-        if conversation.id in manager.conversation_connections:
-            del manager.conversation_connections[conversation.id]
+    finally:
+        if conversation_id and conversation_id in manager.conversation_connections:
+            del manager.conversation_connections[conversation_id]
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()

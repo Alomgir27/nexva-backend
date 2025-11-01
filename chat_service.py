@@ -9,7 +9,12 @@ OLLAMA_MODEL = "llama3.2:3b"
 
 class ChatService:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=60.0)
+        self.client = None
+    
+    async def _get_client(self):
+        if not self.client:
+            self.client = httpx.AsyncClient(timeout=60.0)
+        return self.client
     
     async def get_context(self, chatbot_id: int, query: str) -> str:
         results = await search.search_chatbot_content(chatbot_id, query, max_results=5)
@@ -65,8 +70,10 @@ Guidelines:
         messages.extend(history[-10:])
         messages.append({"role": "user", "content": message})
         
+        client = await self._get_client()
+        
         try:
-            async with self.client.stream(
+            async with client.stream(
                 'POST',
                 f"{OLLAMA_HOST}/api/chat",
                 json={
@@ -88,7 +95,9 @@ Guidelines:
             yield f"Error: {str(e)}"
     
     async def close(self):
-        await self.client.aclose()
+        if self.client:
+            await self.client.aclose()
+            self.client = None
 
 chat_service = ChatService()
 
