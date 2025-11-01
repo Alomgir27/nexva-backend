@@ -29,7 +29,7 @@ from r2_service import r2_service
 
 from neural_tts_service import neural_tts
 
-scrape_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="scraper")
+scrape_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="scraper")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
