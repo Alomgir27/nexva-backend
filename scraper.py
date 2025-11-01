@@ -264,7 +264,6 @@ class WebScraper:
                     media_files.append({'type': media_type, 'url': full_url})
                     seen_urls.add(full_url)
         
-        # Limit to 3 media files per page
         return media_files[:3]
     
     def _process_media_file(self, media_url: str, media_type: str) -> Optional[Dict]:
@@ -490,11 +489,14 @@ class WebScraper:
                             print(f"🎬 Found {len(media_files)} media file(s) on {url}")
                         media_urls = [m['url'] for m in media_files]
 
-                        for media in media_files:
+                        for idx, media in enumerate(media_files, 1):
+                            print(f"📥 Processing media {idx}/{len(media_files)}: {media['type']}")
                             result = self._process_media_file(media['url'], media['type'])
                             if result:
                                 media_transcriptions.append(result)
                                 content_data['content'] += f"\n\n[{media['type'].upper()} TRANSCRIPTION from {result['url']}]: {result['transcription']}"
+                            print(f"✅ Media {idx}/{len(media_files)} done, cleaned up")
+                            gc.collect()
                     
                     links = soup.find_all('a', href=True)[:100]
                     
@@ -529,10 +531,15 @@ class WebScraper:
                         pages_since_driver_refresh += 1
                         print(f"✅ Scraped: {normalized_url} ({len(scraped_pages)}/{self.max_pages})")
                         
-                        if pages_since_driver_refresh >= 20:
-                            print("🔄 Refreshing driver after 20 pages...")
-                            driver = self._restart_driver()
-                            pages_since_driver_refresh = 0
+                        if pages_since_driver_refresh >= 10:
+                            print("🔄 Refreshing driver after 10 pages...")
+                            try:
+                                driver = self._restart_driver()
+                                pages_since_driver_refresh = 0
+                            except Exception as restart_error:
+                                print(f"⚠️ Driver restart failed: {restart_error}")
+                                driver = self._get_driver()
+                                pages_since_driver_refresh = 0
                         
                         if len(pages_batch) >= 5:
                             self._batch_index_pages(pages_batch, chatbot_id, domain_id)
@@ -560,7 +567,20 @@ class WebScraper:
                     error_msg = str(e).lower()
                     print(f"❌ Error scraping {url}: {e}")
                     
-                    if any(keyword in error_msg for keyword in ['timeout', 'refused', 'unreachable', '403', '429']):
+                    if any(keyword in error_msg for keyword in ['connection refused', 'connection aborted', 'remote end closed']):
+                        print(f"⚠️ Driver crashed, restarting...")
+                        try:
+                            driver = self._restart_driver()
+                            pages_since_driver_refresh = 0
+                            consecutive_failures = 0
+                            to_visit.insert(0, url)
+                            self.visited.discard(normalized_url)
+                            continue
+                        except Exception as restart_error:
+                            print(f"❌ Failed to restart driver: {restart_error}")
+                            consecutive_failures += 1
+                    
+                    if any(keyword in error_msg for keyword in ['timeout', 'refused', 'unreachable', '403', '429', 'blocked']):
                         print(f"⚠️ Site appears to be blocking requests")
                         consecutive_failures += 1
                     
