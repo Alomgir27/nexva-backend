@@ -56,6 +56,12 @@ export const VoiceChat = {
     }
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      Messaging.addMessage('system', '❌ Speech recognition not supported in this browser. Please use Chrome, Safari, or Edge.');
+      return false;
+    }
+    
     this.recognition = new SpeechRecognition();
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
@@ -173,9 +179,24 @@ export const VoiceChat = {
     };
     
     this.recognition.onerror = (event) => {
+      console.log('Speech recognition error:', event.error);
+      
       if (event.error === 'no-speech' || event.error === 'aborted') {
         return;
       }
+      
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access in your browser settings.');
+        this.cleanup();
+        return;
+      }
+      
+      if (event.error === 'network') {
+        Messaging.addMessage('system', '❌ Network error. Please check your internet connection.');
+        this.cleanup();
+        return;
+      }
+      
       if (this.currentMessageIndex >= 0) {
         this.removeUserMessage();
       }

@@ -4,11 +4,9 @@ import soundfile as sf
 from io import BytesIO
 import torch
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 _model_instance = None
 _model_init_lock = asyncio.Lock()
-_tts_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="tts")
 
 
 class KokoroService:
@@ -33,13 +31,15 @@ class KokoroService:
 
             loop = asyncio.get_event_loop()
             try:
-                self.device = 'cpu'
-                print("🚀 Loading Kokoro-82M on CPU...")
+                # Try GPU first, fallback to CPU
+                device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                print(f"🚀 Loading Kokoro-82M on {device.upper()}...")
                 self.pipeline = await loop.run_in_executor(
-                    None, lambda: KPipeline(lang_code='a', device='cpu')
+                    None, lambda: KPipeline(lang_code='a', device=device)
                 )
+                self.device = device
                 _model_instance = self.pipeline
-                print("✅ Kokoro-82M loaded on CPU (82M params)")
+                print(f"✅ Kokoro-82M loaded on {device.upper()} (82M params)")
             except Exception as e:
                 print(f"❌ Kokoro initialization failed: {e}")
                 self.pipeline = None
@@ -59,7 +59,7 @@ class KokoroService:
         
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _tts_executor,
+            None,
             self._generate_audio,
             text,
             voice_id or voice
@@ -92,7 +92,7 @@ class KokoroService:
             'female-5': 'af_sky',
             'male-1': 'am_adam',
             'male-2': 'am_michael',
-            'male-3': 'af_bella',  # Kokoro has limited male voices
+            'male-3': 'af_bella',
             'male-4': 'af_nicole',
             'male-5': 'af_heart',
         }
@@ -103,16 +103,17 @@ class KokoroService:
         return self.pipeline is not None
 
 async def preload_kokoro():
-    """Preload Kokoro model at startup"""
+    """Preload Kokoro model at startup with GPU fallback"""
     global _model_instance
     if _model_instance is None:
         loop = asyncio.get_event_loop()
         try:
-            print("🚀 Loading Kokoro-82M on CPU...")
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            print(f"🚀 Loading Kokoro-82M on {device.upper()}...")
             _model_instance = await loop.run_in_executor(
-                None, lambda: KPipeline(lang_code='a', device='cpu')
+                None, lambda: KPipeline(lang_code='a', device=device)
             )
-            print("✅ Kokoro-82M loaded on CPU (82M params)")
+            print(f"✅ Kokoro-82M loaded on {device.upper()} (82M params)")
         except Exception as e:
             print(f"❌ Kokoro preload failed: {e}")
     
