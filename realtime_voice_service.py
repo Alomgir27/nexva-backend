@@ -220,11 +220,11 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
                     if (has_paragraph or is_long) and len(display_buffer.strip()) > 50:
                         if interrupt_flag["interrupted"]:
                             return
-                        await handle_tts_chunk(websocket, display_buffer, voice_id)
+                        asyncio.create_task(handle_tts_chunk(websocket, display_buffer, voice_id))
                         display_buffer = ""
         
         if not interrupt_flag["interrupted"] and len(display_buffer.strip()) > 5:
-            await generate_and_send_audio(websocket, display_buffer, voice_id)
+            asyncio.create_task(generate_and_send_audio(websocket, display_buffer, voice_id))
         
         if not interrupt_flag["interrupted"]:
             await safe_send_json(websocket, {"type": "response_end"})

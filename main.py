@@ -28,6 +28,7 @@ import secrets
 from r2_service import r2_service
 
 scrape_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="scraper")
+tts_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tts")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
