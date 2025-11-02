@@ -10,12 +10,15 @@ import search
 import models
 import httpx
 from neural_tts_service import neural_tts
+from concurrent.futures import ThreadPoolExecutor
 
 OLLAMA_API = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3.2:3b"
 
 CODE_INDICATORS = ['```', 'function', 'class ', 'def ', 'import ', 'const ', 'return ', 'async ', 'SELECT ']
 CODE_KEYWORDS = ['code', 'example', 'how to', 'tutorial', 'syntax', 'implement']
+
+_audio_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="audio")
 
 async def safe_send_json(ws: WebSocket, data: dict) -> bool:
     if ws.client_state != WebSocketState.CONNECTED:
@@ -56,21 +59,29 @@ def clean_text_for_tts(text: str) -> str:
 
 async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
     try:
-        print(f"🎵 TTS: '{text[:80]}...' ({len(text)} chars)")
+        print(f"🎵 TTS: '{text[:50]}...' ({len(text)} chars)")
+        
+        # Generate audio in thread pool (non-blocking)
         audio_data = await neural_tts.generate_speech_async(text, voice=voice_id, language="en")
         
-        audio = AudioSegment.from_wav(BytesIO(audio_data))
-        audio = audio.speedup(playback_speed=1.15).set_channels(1)
+        # Audio processing in dedicated thread pool
+        loop = asyncio.get_event_loop()
         
-        output = BytesIO()
-        audio.export(output, format="wav")
+        def process_audio():
+            audio = AudioSegment.from_wav(BytesIO(audio_data))
+            audio = audio.speedup(playback_speed=1.15).set_channels(1)
+            output = BytesIO()
+            audio.export(output, format="wav")
+            return output.getvalue()
+        
+        audio_bytes = await loop.run_in_executor(_audio_executor, process_audio)
         
         await safe_send_json(ws, {
             "type": "audio_chunk",
-            "audio": base64.b64encode(output.getvalue()).decode(),
+            "audio": base64.b64encode(audio_bytes).decode(),
             "format": "wav"
         })
-        print(f"✅ Audio sent: {len(output.getvalue())} bytes")
+        print(f"✅ Audio sent: {len(audio_bytes)} bytes")
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
 

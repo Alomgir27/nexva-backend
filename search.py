@@ -2,6 +2,8 @@ from elasticsearch import Elasticsearch
 from sentence_transformers import SentenceTransformer
 import httpx
 import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 ES_HOST = "http://localhost:9200"
 OLLAMA_HOST = "http://localhost:11434"
@@ -11,6 +13,7 @@ es = Elasticsearch([ES_HOST], headers={"accept": "application/json", "content-ty
 
 # Lazy load embedding model
 _embedding_model = None
+_embedding_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="embedding")
 
 def get_embedding_model():
     """Lazy load the embedding model to save memory at startup"""
@@ -205,7 +208,13 @@ async def search_chatbot_content(chatbot_id: int, query: str, max_results: int =
     
     try:
         model = get_embedding_model()
-        query_embedding = model.encode(query, show_progress_bar=False).tolist()
+        
+        # Generate embedding in thread pool (non-blocking)
+        loop = asyncio.get_event_loop()
+        query_embedding = await loop.run_in_executor(
+            _embedding_executor,
+            lambda: model.encode(query, show_progress_bar=False).tolist()
+        )
         
         query_tags = await extract_query_tags(query)
         
