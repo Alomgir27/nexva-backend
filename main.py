@@ -15,7 +15,7 @@ import voice_service
 import voice_rtc_service
 import websocket_handler
 import auth_service
-import realtime_voice_service
+# Lazy import realtime_voice_service to avoid heavy Kokoro imports at startup
 import transcription_service
 import email_service
 import document_service
@@ -705,6 +705,7 @@ async def voice_websocket(websocket: WebSocket, api_key: str):
 @app.websocket("/ws/voice-chat/{api_key}")
 async def voice_chat_websocket(websocket: WebSocket, api_key: str):
     """Voice chat with Web Speech API (browser transcription) + LLM + TTS"""
+    import realtime_voice_service
     await realtime_voice_service.handle_voice_chat(websocket, api_key)
 
 @app.websocket("/ws/transcribe/{api_key}")

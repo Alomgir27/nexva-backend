@@ -166,7 +166,7 @@ echo "║         Starting Nexva Backend         ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 
-# Calculate workers based on RAM (conservative)
+# Calculate workers based on RAM
 TOTAL_RAM_GB=$(free -g | awk '/^Mem:/{print $2}')
 if [ "$TOTAL_RAM_GB" -gt 100 ]; then
     WORKERS=4
@@ -180,7 +180,7 @@ fi
 
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
-echo "⚡ Workers: $WORKERS (staggered startup, RAM: ${TOTAL_RAM_GB}GB)"
+echo "⚡ Workers: $WORKERS (lazy imports prevent startup memory issues)"
 echo ""
 echo "📝 Management commands:"
 echo "   • View logs: tail -f nohup.out"
@@ -189,12 +189,11 @@ echo ""
 
 source venv/bin/activate
 
-# Preload models BEFORE starting workers to share memory
+# Preload only lightweight models
 echo "📦 Preloading shared models..."
 python3 -c "
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
-
 print('Loading embedding model...')
 import search
 search.get_embedding_model()
@@ -202,9 +201,8 @@ print('✅ Embedding model loaded')
 " 2>/dev/null || echo "⚠️ Model preload skipped"
 
 echo ""
-echo "🚀 Starting Uvicorn with $WORKERS workers..."
+echo "🚀 Starting Uvicorn (single worker)..."
 
-# Use --preload to share memory between workers
 nohup uvicorn main:app \
     --host 0.0.0.0 \
     --port $PORT \
@@ -212,9 +210,7 @@ nohup uvicorn main:app \
     --timeout-keep-alive 120 \
     --limit-concurrency 100 \
     --backlog 200 \
-    --log-level info \
-    --loop uvloop \
-    --no-access-log > nohup.out 2>&1 &
+    --log-level info > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."
@@ -230,12 +226,12 @@ if curl -s http://localhost:$PORT/docs > /dev/null 2>&1; then
     echo ""
     echo "⚙️  Configuration:"
     echo "   • $WORKERS worker processes"
-    echo "   • Models preloaded and shared"
-    echo "   • Staggered startup prevents memory spikes"
+    echo "   • Kokoro lazy-loads only on TTS requests"
+    echo "   • Embedding model preloaded"
     echo ""
     echo "📋 Management:"
     echo "   • View logs: tail -f nohup.out"
-    echo "   • Monitor: ps aux | grep uvicorn"
+    echo "   • Workers: ps aux | grep uvicorn"
     echo "   • Stop: pkill -f 'uvicorn main:app'"
     echo ""
 elif ps -p $BACKEND_PID > /dev/null 2>&1; then
