@@ -15,6 +15,7 @@ window.NexvaChat = NexvaChat;
       placeholder: script.getAttribute('data-placeholder'),
       enableVoice: script.getAttribute('data-enable-voice') === 'true',
       enableHumanSupport: script.getAttribute('data-enable-human-support') === 'true',
+      enableIntroSound: script.getAttribute('data-enable-intro-sound') !== 'false',
       theme: script.getAttribute('data-theme'),
       borderRadius: script.getAttribute('data-border-radius'),
       borderColor: script.getAttribute('data-border-color'),

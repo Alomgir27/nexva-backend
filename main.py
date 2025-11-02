@@ -1358,6 +1358,21 @@ async def serve_notification_sound():
         }
     )
 
+@app.get("/intro.wav")
+async def serve_intro_sound():
+    """Serve intro sound for voice chat"""
+    import os
+    audio_path = os.path.join(os.path.dirname(__file__), "intro.wav")
+    return FileResponse(
+        audio_path,
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET"
+        }
+    )
+
 
 @app.get("/src/{filename:path}")
 async def serve_widget_src(filename: str):

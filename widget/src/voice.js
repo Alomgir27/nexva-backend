@@ -19,6 +19,7 @@ export const VoiceChat = {
   micStream: null,
   onTranscriptCallback: null,
   isEdge: /Edg\//.test(navigator.userAgent),
+  introAudio: null,
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -97,6 +98,15 @@ export const VoiceChat = {
       
       UI.animateHeaderTitle(true, this.originalHeaderTitle);
       this.setListeningEffect();
+      
+      const config = window.NexvaChat?.config;
+      if (config && config.enableIntroSound) {
+        if (!this.introAudio) {
+          this.introAudio = new Audio(`${config.apiUrl}/intro.wav`);
+          this.introAudio.volume = 0.7;
+        }
+        this.introAudio.play().catch(() => {});
+      }
     };
     
     this.recognition.onresult = (event) => {
