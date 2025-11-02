@@ -255,8 +255,40 @@ def delete_chatbot(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
+    # Delete messages for all conversations
+    conversations = db.query(models.Conversation).filter(models.Conversation.chatbot_id == chatbot_id).all()
+    for conv in conversations:
+        db.query(models.Message).filter(models.Message.conversation_id == conv.id).delete()
+    
+    # Delete conversations
+    db.query(models.Conversation).filter(models.Conversation.chatbot_id == chatbot_id).delete()
+    
+    # Delete support tickets
+    db.query(models.SupportTicket).filter(models.SupportTicket.chatbot_id == chatbot_id).delete()
+    
+    # Delete support team members
+    db.query(models.SupportTeamMember).filter(models.SupportTeamMember.chatbot_id == chatbot_id).delete()
+    
+    # Delete scraped pages and documents for all domains
+    domains = db.query(models.Domain).filter(models.Domain.chatbot_id == chatbot_id).all()
+    for domain in domains:
+        db.query(models.ScrapedPage).filter(models.ScrapedPage.domain_id == domain.id).delete()
+        db.query(models.DomainDocument).filter(models.DomainDocument.domain_id == domain.id).delete()
+        db.query(models.ScrapeJob).filter(models.ScrapeJob.domain_id == domain.id).delete()
+    
+    # Delete domains
+    db.query(models.Domain).filter(models.Domain.chatbot_id == chatbot_id).delete()
+    
+    # Delete Elasticsearch index
+    try:
+        search.es.indices.delete(index=search.get_chatbot_index(chatbot_id), ignore=[404])
+    except:
+        pass
+    
+    # Delete chatbot
     db.delete(chatbot)
     db.commit()
+    
     return {"message": "Chatbot deleted successfully"}
 
 @app.put("/api/chatbots/{chatbot_id}/voice")
