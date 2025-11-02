@@ -27,7 +27,7 @@ import shutil
 import secrets
 from r2_service import r2_service
 
-scrape_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="scraper")
+scrape_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="scraper")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
