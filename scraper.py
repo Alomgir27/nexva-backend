@@ -201,51 +201,67 @@ class WebScraper:
         return None
     
     def _extract_media_urls(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, str]]:
-        """Extract video URLs only (no audio) including YouTube/Vimeo"""
+        """Extract video URLs including YouTube/Vimeo and custom players"""
         media_files = []
         seen_urls = set()
-        video_formats = ['.mp4', '.webm', '.avi', '.mov', '.flv']
+        video_formats = ['.mp4', '.webm', '.avi', '.mov', '.flv', '.m3u8']
         
-        # Find video tags only
+        # Find standard video tags
         for video in soup.find_all('video'):
-            src = video.get('src')
-            if src:
-                full_url = urljoin(base_url, src)
-                if any(full_url.lower().endswith(fmt) for fmt in video_formats) and full_url not in seen_urls:
-                    media_files.append({'type': 'video', 'url': full_url})
-                    seen_urls.add(full_url)
-            
-            for source in video.find_all('source'):
-                src = source.get('src')
+            for attr in ['src', 'data-src', 'data-video-src', 'data-url']:
+                src = video.get(attr)
                 if src:
                     full_url = urljoin(base_url, src)
                     if any(full_url.lower().endswith(fmt) for fmt in video_formats) and full_url not in seen_urls:
                         media_files.append({'type': 'video', 'url': full_url})
                         seen_urls.add(full_url)
+            
+            for source in video.find_all('source'):
+                for attr in ['src', 'data-src']:
+                    src = source.get(attr)
+                    if src:
+                        full_url = urljoin(base_url, src)
+                        if any(full_url.lower().endswith(fmt) for fmt in video_formats) and full_url not in seen_urls:
+                            media_files.append({'type': 'video', 'url': full_url})
+                            seen_urls.add(full_url)
         
         # Find YouTube/Vimeo embeds in iframes
         for iframe in soup.find_all('iframe'):
-            src = iframe.get('src') or iframe.get('data-src')
-            if src:
-                youtube_url = self._extract_youtube_url(src)
-                if youtube_url and youtube_url not in seen_urls:
-                    media_files.append({'type': 'youtube', 'url': youtube_url})
-                    seen_urls.add(youtube_url)
-                    continue
-                
-                vimeo_url = self._extract_vimeo_url(src)
-                if vimeo_url and vimeo_url not in seen_urls:
-                    media_files.append({'type': 'vimeo', 'url': vimeo_url})
-                    seen_urls.add(vimeo_url)
+            for attr in ['src', 'data-src', 'data-lazy-src']:
+                src = iframe.get(attr)
+                if src:
+                    youtube_url = self._extract_youtube_url(src)
+                    if youtube_url and youtube_url not in seen_urls:
+                        media_files.append({'type': 'youtube', 'url': youtube_url})
+                        seen_urls.add(youtube_url)
+                        continue
+                    
+                    vimeo_url = self._extract_vimeo_url(src)
+                    if vimeo_url and vimeo_url not in seen_urls:
+                        media_files.append({'type': 'vimeo', 'url': vimeo_url})
+                        seen_urls.add(vimeo_url)
         
-        # Find direct video links in data attributes
-        for elem in soup.find_all(attrs={'data-src': True}):
-            src = elem.get('data-src')
-            if src and any(src.lower().endswith(fmt) for fmt in video_formats):
-                full_url = urljoin(base_url, src)
-                if full_url not in seen_urls:
-                    media_files.append({'type': 'video', 'url': full_url})
-                    seen_urls.add(full_url)
+        # Find videos in data attributes and custom players
+        for attr_name in ['data-src', 'data-video-url', 'data-video-src', 'data-background-video']:
+            for elem in soup.find_all(attrs={attr_name: True}):
+                src = elem.get(attr_name)
+                if src and any(src.lower().endswith(fmt) for fmt in video_formats):
+                    full_url = urljoin(base_url, src)
+                    if full_url not in seen_urls:
+                        media_files.append({'type': 'video', 'url': full_url})
+                        seen_urls.add(full_url)
+        
+        # Check for video URLs in script tags (JSON data)
+        for script in soup.find_all('script', type='application/json'):
+            script_content = script.string
+            if script_content:
+                for fmt in video_formats:
+                    pattern = rf'(https?://[^\s"\'<>]+{fmt})'
+                    matches = re.findall(pattern, script_content, re.IGNORECASE)
+                    for match in matches:
+                        if match not in seen_urls:
+                            media_files.append({'type': 'video', 'url': match})
+                            seen_urls.add(match)
         
         return media_files[:3]
     
@@ -447,6 +463,7 @@ class WebScraper:
                         driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
                         time.sleep(0.3)
                         driver.execute_script("window.scrollTo(0, 0);")
+                        time.sleep(0.5)  # Wait for lazy-loaded videos
                     except:
                         pass
                     

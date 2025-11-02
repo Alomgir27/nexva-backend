@@ -113,12 +113,28 @@ class KokoroService:
         return self.pipeline is not None
 
 async def preload_kokoro():
+    """Preload Kokoro model at startup"""
     global _model_instance
     if _model_instance is None:
-        service = KokoroService()
-        await service._ensure_model()
-        return service
-    return KokoroService()
+        loop = asyncio.get_event_loop()
+        try:
+            if torch.cuda.is_available():
+                print("🚀 Loading Kokoro-82M on GPU...")
+                _model_instance = await loop.run_in_executor(
+                    None, lambda: KPipeline(lang_code='a', device='cuda')
+                )
+                print("✅ Kokoro-82M loaded on GPU (82M params)")
+            else:
+                print("🚀 Loading Kokoro-82M on CPU...")
+                _model_instance = await loop.run_in_executor(
+                    None, lambda: KPipeline(lang_code='a', device='cpu')
+                )
+                print("✅ Kokoro-82M loaded on CPU (82M params)")
+        except Exception as e:
+            print(f"❌ Kokoro preload failed: {e}")
+    
+    kokoro_service.pipeline = _model_instance
+    kokoro_service.device = _model_instance.device if _model_instance and hasattr(_model_instance, 'device') else 'cpu'
 
 kokoro_service = KokoroService()
 
