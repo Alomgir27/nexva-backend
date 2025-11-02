@@ -33,20 +33,27 @@ scrape_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="scraper"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    models.init_db()
-    search.init_elasticsearch()
-    print("🚀 Preloading all models...")
-    search.get_embedding_model()
+    try:
+        models.init_db()
+        search.init_elasticsearch()
+        print("🚀 Preloading all models...", flush=True)
+        search.get_embedding_model()
+        
+        from kokoro_service import preload_kokoro
+        await preload_kokoro()
+        
+        print("✅ All models loaded and ready", flush=True)
+    except Exception as e:
+        print(f"❌ Startup error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
     
-    from kokoro_service import preload_kokoro
-    await preload_kokoro()
-    
-    print("✅ All models loaded and ready")
     yield
-    print("🛑 Shutting down...")
+    
+    print("🛑 Shutting down...", flush=True)
     scrape_executor.shutdown(wait=False)
     await chat_service.chat_service.close()
-    print("✅ Cleanup complete")
+    print("✅ Cleanup complete", flush=True)
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)
 

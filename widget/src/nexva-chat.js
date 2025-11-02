@@ -18,7 +18,7 @@ export const NexvaChat = {
   
   init: function(apiKey, options) {
     // Prevent double initialization
-    if (this.initialized) {
+    if (this.initialized && this.config && this.config.apiKey === apiKey) {
       return;
     }
     
@@ -498,6 +498,32 @@ export const NexvaChat = {
       this.notificationAudio.currentTime = 0;
       this.notificationAudio.play().catch(() => {});
     }
+  },
+  
+  destroy: function() {
+    this.stopVoiceChat();
+    VoiceChat.stop();
+    
+    if (this.voiceChatWs) {
+      this.voiceChatWs.close();
+      this.voiceChatWs = null;
+    }
+    
+    WebSocketManager.close();
+    
+    const container = document.querySelector('.nexva-chat-container');
+    if (container) {
+      container.remove();
+    }
+    
+    this.isOpen = false;
+    this.supportRequested = false;
+    this.initialized = false;
+    this.conversationId = null;
+    this.currentMode = 'ai';
+    this.hasReceivedSupportResponse = false;
+    this.notificationAudio = null;
+    this.config = null;
   }
 };
 
