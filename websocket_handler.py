@@ -237,6 +237,15 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: m
             if not content.strip():
                 continue
             
+            db.refresh(ticket)
+            
+            if ticket.status == "resolved":
+                await websocket.send_json({
+                    'type': 'error',
+                    'message': 'This ticket has been resolved. Please reopen it to continue.'
+                })
+                continue
+            
             db_message = models.Message(
                 conversation_id=ticket.conversation_id,
                 role='assistant',

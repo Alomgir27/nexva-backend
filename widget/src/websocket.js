@@ -92,6 +92,11 @@ export const WebSocketManager = {
         if (onConversationUpdate) {
           onConversationUpdate(this.conversationId, 'ai');
         }
+      } else if (data.type === 'ticket_reopened') {
+        Messaging.addMessage('system', '🔄 ' + data.message);
+        if (onConversationUpdate) {
+          onConversationUpdate(this.conversationId, 'human');
+        }
       }
     };
     

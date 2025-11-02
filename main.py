@@ -1227,6 +1227,44 @@ async def resolve_ticket(
     
     return {"message": "Ticket resolved"}
 
+@app.post("/api/tickets/{ticket_id}/reopen")
+async def reopen_ticket(
+    ticket_id: int,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    ticket = db.query(models.SupportTicket).filter(
+        models.SupportTicket.id == ticket_id
+    ).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    if not auth_service.verify_support_member_access(current_user, ticket.chatbot_id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if ticket.status != "resolved":
+        raise HTTPException(status_code=400, detail="Ticket is not resolved")
+    
+    ticket.status = "in_progress"
+    ticket.resolved_at = None
+    ticket.assigned_to = current_user.email
+    
+    conversation = db.query(models.Conversation).filter(
+        models.Conversation.id == ticket.conversation_id
+    ).first()
+    if conversation:
+        conversation.mode = "human"
+    
+    db.commit()
+    
+    import websocket_handler
+    await websocket_handler.manager.send_to_conversation(ticket.conversation_id, {
+        'type': 'ticket_reopened',
+        'message': 'Your ticket has been reopened. A support agent will assist you.'
+    })
+    
+    return {"message": "Ticket reopened"}
+
 @app.post("/api/support/tickets/{ticket_id}/message")
 def send_support_message(
     ticket_id: int,
