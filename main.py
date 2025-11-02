@@ -34,17 +34,13 @@ async def lifespan(app: FastAPI):
     try:
         models.init_db()
         search.init_elasticsearch()
-        print("🚀 Initializing models...", flush=True)
-        search.get_embedding_model()
-        
-        # Kokoro will lazy-load per worker on first TTS request
-        print("ℹ️  Kokoro TTS: lazy-load on first request (per worker)", flush=True)
+        print("🚀 Backend ready (models lazy-load on demand)", flush=True)
         
         # Import neural_tts
         global neural_tts
         from neural_tts_service import neural_tts
         
-        print("✅ Backend ready", flush=True)
+        print("✅ Startup complete", flush=True)
     except Exception as e:
         print(f"❌ Startup error: {e}", flush=True)
         import traceback

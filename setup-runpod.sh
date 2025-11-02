@@ -166,13 +166,23 @@ echo "║         Starting Nexva Backend         ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 
-# Auto-detect optimal workers based on CPU cores
+# Auto-detect optimal workers based on CPU cores AND memory
 CPU_CORES=$(nproc 2>/dev/null || echo 2)
-WORKERS=${WORKERS:-$((CPU_CORES > 4 ? 4 : CPU_CORES))}
+TOTAL_RAM_GB=$(free -g | awk '/^Mem:/{print $2}')
+
+# Conservative worker calculation: 1 worker per 6GB RAM, max 4
+if [ -n "$TOTAL_RAM_GB" ] && [ "$TOTAL_RAM_GB" -gt 0 ]; then
+    MAX_WORKERS_BY_RAM=$((TOTAL_RAM_GB / 6))
+    [ "$MAX_WORKERS_BY_RAM" -lt 1 ] && MAX_WORKERS_BY_RAM=1
+    [ "$MAX_WORKERS_BY_RAM" -gt 4 ] && MAX_WORKERS_BY_RAM=4
+    WORKERS=${WORKERS:-$MAX_WORKERS_BY_RAM}
+else
+    WORKERS=${WORKERS:-2}
+fi
 
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
-echo "⚡ Workers: $WORKERS (CPU cores: $CPU_CORES)"
+echo "⚡ Workers: $WORKERS (CPU: $CPU_CORES cores, RAM: ${TOTAL_RAM_GB}GB)"
 echo ""
 echo "📝 Management commands:"
 echo "   • View logs: tail -f nohup.out"
