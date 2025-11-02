@@ -156,7 +156,10 @@ export const WebSocketManager = {
   updatePlaybackStatus: function(isPlaying) {
     VoiceChat.setAssistantSpeaking(isPlaying);
     const voiceStatus = document.getElementById('nexvaVoiceStatus');
-    if (voiceStatus) {
+    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
+    const isVoiceChatActive = voiceToggleBtn && voiceToggleBtn.classList.contains('recording');
+    
+    if (voiceStatus && isVoiceChatActive) {
       if (isPlaying) {
         if (VoiceChat.isEdge) {
           voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Assistant speaking...</span>';
