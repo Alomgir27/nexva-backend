@@ -188,8 +188,6 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
     if websocket.client_state != WebSocketState.CONNECTED:
         return
     
-    tts_tasks = []  # Track background TTS tasks
-    
     try:
         print(f"💬 Query: '{text_query}'")
         
@@ -215,10 +213,6 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
                 async for line in response.aiter_lines():
                     if interrupt_flag["interrupted"]:
                         print("🛑 Processing interrupted by user")
-                        # Cancel pending TTS tasks
-                        for task in tts_tasks:
-                            if not task.done():
-                                task.cancel()
                         return
                     
                     if websocket.client_state != WebSocketState.CONNECTED:
@@ -230,38 +224,27 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
                     buffer += chunk
                     display_buffer += chunk
                     
-                    # Send text to UI immediately (non-blocking)
+                    # Send text to UI immediately
                     if not await safe_send_json(websocket, {"type": "text_chunk", "text": chunk}):
                         return
                     
                     has_paragraph = display_buffer.count('. ') >= 2 or '\n\n' in display_buffer
                     is_long = len(display_buffer) > 200
                     
-                    # Generate TTS in parallel (non-blocking)
+                    # Generate TTS sequentially (wait for completion)
                     if (has_paragraph or is_long) and len(display_buffer.strip()) > 50:
-                        if not interrupt_flag["interrupted"]:
-                            print(f"🎯 Queueing TTS chunk ({len(display_buffer)} chars, sentences: {display_buffer.count('. ')})")
-                            # Fire TTS task without awaiting (parallel execution)
-                            task = asyncio.create_task(
-                                handle_tts_chunk(websocket, display_buffer, voice_id)
-                            )
-                            tts_tasks.append(task)
-                            display_buffer = ""
+                        if interrupt_flag["interrupted"]:
+                            print("🛑 Processing interrupted before TTS")
+                            return
+                        print(f"🎯 Processing TTS chunk ({len(display_buffer)} chars, sentences: {display_buffer.count('. ')})")
+                        await handle_tts_chunk(websocket, display_buffer, voice_id)
+                        display_buffer = ""
         
         # Generate final TTS chunk
         if not interrupt_flag["interrupted"] and len(display_buffer.strip()) > 5:
             text = clean_text_for_tts(display_buffer.strip())
             if text and len(text) > 5:
-                task = asyncio.create_task(
-                    generate_and_send_audio(websocket, text, voice_id)
-                )
-                tts_tasks.append(task)
-        
-        # Wait for all TTS tasks to complete
-        if tts_tasks:
-            print(f"⏳ Waiting for {len(tts_tasks)} TTS tasks to complete...")
-            await asyncio.gather(*tts_tasks, return_exceptions=True)
-            print(f"✅ All TTS tasks completed")
+                await generate_and_send_audio(websocket, text, voice_id)
         
         if not interrupt_flag["interrupted"]:
             await safe_send_json(websocket, {"type": "response_end"})
@@ -273,8 +256,3 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
         if "disconnect" not in str(e).lower():
             print(f"❌ Error: {e}")
         await safe_send_json(websocket, {"type": "error", "message": f"Processing error: {str(e)}"})
-    finally:
-        # Cancel any remaining TTS tasks
-        for task in tts_tasks:
-            if not task.done():
-                task.cancel()

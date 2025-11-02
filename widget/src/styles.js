@@ -78,7 +78,23 @@ export const Styles = {
         color: ${primaryColor};
         flex-shrink: 0;
       }
-      .nexva-chat-window { display: none; position: fixed; ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} width: min(400px, calc(100vw - 40px)); height: min(650px, calc(100vh - 120px)); max-height: calc(100vh - 120px); max-width: calc(100vw - 40px); background: ${bgBase}; border-radius: ${borderRadius}; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); flex-direction: column; overflow: hidden; border: 0.5px solid ${borderColor}; z-index: 999999; }
+      .nexva-chat-window { 
+        display: none; 
+        position: fixed; 
+        ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} 
+        ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} 
+        width: min(400px, calc(100vw - 40px)); 
+        height: min(650px, calc(100vh - 120px)); 
+        max-height: calc(100vh - 120px); 
+        max-width: calc(100vw - 40px); 
+        background: ${bgBase}; 
+        border-radius: ${borderRadius}; 
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); 
+        flex-direction: column; 
+        overflow: hidden; 
+        border: 0.5px solid ${borderColor}; 
+        z-index: 999999; 
+      }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }
       .nexva-chat-window.docked { position: fixed; width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; right: 0; left: auto; border-right: none; border-top: none; border-bottom: none; box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15); animation: slideInRight 0.3s ease; z-index: 999998; }
@@ -268,7 +284,21 @@ export const Styles = {
       @keyframes subtlePulse { 0% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); } 50% { box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3); } 100% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); } }
       @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
       @media (max-width: 480px) { 
-        .nexva-chat-window { width: calc(100vw - 40px); height: calc(100vh - 120px); } 
+        .nexva-chat-container { 
+          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
+          ${position.includes('bottom') ? 'bottom: 10px;' : 'top: 10px;'}
+        }
+        .nexva-chat-window { 
+          width: calc(100vw - 20px); 
+          height: calc(100vh - 80px);
+          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
+          ${position.includes('bottom') ? 'bottom: 70px;' : 'top: 70px;'}
+        } 
+        .nexva-notification-bubble {
+          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
+          ${position.includes('bottom') ? 'bottom: ' + (parseInt(bubbleSize) + 20) + 'px;' : 'top: ' + (parseInt(bubbleSize) + 20) + 'px;'}
+          max-width: calc(100vw - 80px);
+        }
         .nexva-mode-switcher-container { display: none; }
         .nexva-chat-tabs { flex: 1; }
         .nexva-chat-message-content { max-width: 85%; }
