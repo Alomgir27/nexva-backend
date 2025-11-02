@@ -34,17 +34,17 @@ async def lifespan(app: FastAPI):
     try:
         models.init_db()
         search.init_elasticsearch()
-        print("🚀 Preloading all models...", flush=True)
+        print("🚀 Initializing models...", flush=True)
         search.get_embedding_model()
         
-        from kokoro_service import preload_kokoro
-        await preload_kokoro()
+        # Kokoro will lazy-load per worker on first TTS request
+        print("ℹ️  Kokoro TTS: lazy-load on first request (per worker)", flush=True)
         
-        # Import neural_tts after kokoro is loaded
+        # Import neural_tts
         global neural_tts
         from neural_tts_service import neural_tts
         
-        print("✅ All models loaded and ready", flush=True)
+        print("✅ Backend ready", flush=True)
     except Exception as e:
         print(f"❌ Startup error: {e}", flush=True)
         import traceback
@@ -54,7 +54,11 @@ async def lifespan(app: FastAPI):
     
     print("🛑 Shutting down...", flush=True)
     scrape_executor.shutdown(wait=False)
-    await chat_service.chat_service.close()
+    try:
+        import chat_service
+        await chat_service.chat_service.close()
+    except:
+        pass
     print("✅ Cleanup complete", flush=True)
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)

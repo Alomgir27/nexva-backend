@@ -97,12 +97,8 @@ class KokoroService:
         return self.pipeline is not None
 
 async def preload_kokoro():
-    print(f"🚀 Preloading Kokoro model...")
-    await kokoro_service._ensure_model()
-    if kokoro_service.is_available:
-        print(f"✅ Kokoro preloaded successfully on {kokoro_service.device}")
-    else:
-        print(f"⚠️ Kokoro preload failed, will retry on first request")
+    """Multi-worker mode: each worker lazy-loads Kokoro on first TTS request"""
+    pass
 
 kokoro_service = KokoroService()
 
