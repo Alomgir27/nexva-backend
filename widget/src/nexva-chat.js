@@ -337,8 +337,8 @@ export const NexvaChat = {
     }, existingConversationId);
     
     WebSocketManager.onSupportMessage = () => {
-      if (!this.hasReceivedSupportResponse) {
-        this.hasReceivedSupportResponse = true;
+      console.log('[Nexva] Support message received, isOpen:', this.isOpen);
+      if (!this.isOpen) {
         this.showNotification();
       }
     };

@@ -18,6 +18,7 @@ export const WebSocketManager = {
   reconnectDelay: 2000,
   reconnectTimer: null,
   isManualClose: false,
+  heartbeatInterval: null,
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
@@ -37,6 +38,7 @@ export const WebSocketManager = {
     this.ws = new WebSocket(`${protocol}//${host}/ws/chat/${config.apiKey}`);
     
     this.ws.onopen = () => {
+      console.log('[WebSocket] ✅ Connected successfully');
       this.reconnectAttempts = 0;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -50,6 +52,15 @@ export const WebSocketManager = {
         initMessage.conversation_id = this.conversationId;
       }
       this.ws.send(JSON.stringify(initMessage));
+      
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+      }
+      this.heartbeatInterval = setInterval(() => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
     };
     
     this.ws.onmessage = (event) => {
@@ -104,8 +115,14 @@ export const WebSocketManager = {
       console.error('[WebSocket] Error:', error);
     };
     
-    this.ws.onclose = () => {
+    this.ws.onclose = (event) => {
+      console.log(`[WebSocket] Connection closed - Code: ${event.code}, Reason: ${event.reason}, Clean: ${event.wasClean}`);
       this.ws = null;
+      
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+      }
       
       if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
@@ -117,6 +134,10 @@ export const WebSocketManager = {
             this.connect(this.config, this.onConversationUpdate, this.conversationId);
           }
         }, delay);
+      } else if (this.isManualClose) {
+        console.log('[WebSocket] Manual close - not reconnecting');
+      } else {
+        console.log('[WebSocket] Max reconnect attempts reached');
       }
     };
   },
@@ -137,6 +158,10 @@ export const WebSocketManager = {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
     if (this.ws) {
       this.ws.close();
