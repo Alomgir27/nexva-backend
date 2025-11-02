@@ -37,6 +37,10 @@ async def lifespan(app: FastAPI):
     search.init_elasticsearch()
     print("🚀 Preloading all models...")
     search.get_embedding_model()
+    
+    from kokoro_service import preload_kokoro
+    await preload_kokoro()
+    
     print("✅ All models loaded and ready")
     yield
     print("🛑 Shutting down...")
