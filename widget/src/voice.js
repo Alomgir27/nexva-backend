@@ -20,6 +20,7 @@ export const VoiceChat = {
   onTranscriptCallback: null,
   isEdge: /Edg\//.test(navigator.userAgent),
   introAudio: null,
+  introSoundPlayed: false,
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -100,7 +101,8 @@ export const VoiceChat = {
       this.setListeningEffect();
       
       const config = window.NexvaChat?.config;
-      if (config && config.enableIntroSound) {
+      if (config && config.enableIntroSound && !this.introSoundPlayed) {
+        this.introSoundPlayed = true;
         if (!this.introAudio) {
           this.introAudio = new Audio(`${config.apiUrl}/intro.wav`);
           this.introAudio.volume = 0.7;
@@ -348,6 +350,7 @@ export const VoiceChat = {
     this.messageSent = false;
     this.assistantSpeaking = false;
     this.onTranscriptCallback = null;
+    this.introSoundPlayed = false;
     const indicator = document.getElementById('nexvaVoiceIndicator');
     if (indicator) {
       indicator.classList.remove('active');

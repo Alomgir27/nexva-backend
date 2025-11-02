@@ -255,7 +255,12 @@ def delete_chatbot(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
-    # Delete support tickets first (before conversations due to FK)
+    # Break circular FK: Set conversation.ticket_id to NULL first
+    db.query(models.Conversation).filter(
+        models.Conversation.chatbot_id == chatbot_id
+    ).update({models.Conversation.ticket_id: None}, synchronize_session=False)
+    
+    # Delete support tickets
     db.query(models.SupportTicket).filter(models.SupportTicket.chatbot_id == chatbot_id).delete()
     
     # Delete messages for all conversations

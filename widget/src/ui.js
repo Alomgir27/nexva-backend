@@ -1,6 +1,8 @@
 export const UI = {
   isFullscreen: false,
   isDocked: false,
+  isResizing: false,
+  dockWidth: 380,
   
   createWidget: function(config) {
     const container = document.createElement('div');
@@ -44,6 +46,7 @@ export const UI = {
         </div>
       </div>
       <div class="nexva-chat-window" id="nexvaChatWindow">
+        <div class="nexva-resize-handle" id="nexvaResizeHandle" style="display: none;"></div>
         <div class="nexva-chat-header">
           <div class="nexva-chat-header-top">
           <div class="nexva-chat-header-title">
@@ -174,6 +177,8 @@ export const UI = {
     const window = document.getElementById('nexvaChatWindow');
     const btn = document.getElementById('nexvaDock');
     const chatButton = document.getElementById('nexvaChatButton');
+    const resizeHandle = document.getElementById('nexvaResizeHandle');
+    const body = document.body;
     
     if (this.isFullscreen) {
       this.toggleFullscreen();
@@ -184,13 +189,85 @@ export const UI = {
     if (this.isDocked) {
       window.classList.add('docked');
       chatButton.style.display = 'none';
+      
+      // Show resize handle
+      if (resizeHandle) resizeHandle.style.display = 'block';
+      
+      // Push content aside - add margin to body
+      body.style.transition = 'margin-right 0.3s ease';
+      body.style.marginRight = this.dockWidth + 'px';
+      window.style.width = this.dockWidth + 'px';
+      
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h11v11H3zm7 2H5v7h5V5zm4 0v7h5V5h-5zM3 15h11v6H3zm7 2H5v2h5v-2zm4 0v2h5v-2h-5z"/></svg>';
       btn.setAttribute('title', 'Undock');
+      
+      // Attach resize listeners
+      this.attachResizeListeners();
     } else {
       window.classList.remove('docked');
       chatButton.style.display = 'flex';
+      
+      // Hide resize handle
+      if (resizeHandle) resizeHandle.style.display = 'none';
+      
+      // Remove margin from body
+      body.style.marginRight = '0';
+      window.style.width = '';
+      
       btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM3 19V5h11v14H3zm18 0h-5V5h5v14z"/></svg>';
       btn.setAttribute('title', 'Dock');
+      
+      // Remove resize listeners
+      this.removeResizeListeners();
+    }
+  },
+  
+  attachResizeListeners: function() {
+    const resizeHandle = document.getElementById('nexvaResizeHandle');
+    if (!resizeHandle) return;
+    
+    const onMouseDown = (e) => {
+      e.preventDefault();
+      this.isResizing = true;
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      
+      const onMouseMove = (e) => {
+        if (!this.isResizing) return;
+        
+        const newWidth = window.innerWidth - e.clientX;
+        const minWidth = 320;
+        const maxWidth = Math.min(800, window.innerWidth * 0.8);
+        
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+          this.dockWidth = newWidth;
+          const chatWindow = document.getElementById('nexvaChatWindow');
+          chatWindow.style.width = newWidth + 'px';
+          document.body.style.marginRight = newWidth + 'px';
+        }
+      };
+      
+      const onMouseUp = () => {
+        this.isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+    
+    resizeHandle.addEventListener('mousedown', onMouseDown);
+    this._resizeMouseDown = onMouseDown;
+  },
+  
+  removeResizeListeners: function() {
+    const resizeHandle = document.getElementById('nexvaResizeHandle');
+    if (resizeHandle && this._resizeMouseDown) {
+      resizeHandle.removeEventListener('mousedown', this._resizeMouseDown);
+      this._resizeMouseDown = null;
     }
   },
   
