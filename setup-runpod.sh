@@ -163,18 +163,31 @@ python3 -c "import models; models.init_db()" && echo "   ✅ Database initialize
 echo ""
 echo "╔════════════════════════════════════════╗"
 echo "║         Starting Nexva Backend         ║"
-echo "╔════════════════════════════════════════╗"
+echo "╚════════════════════════════════════════╝"
 echo ""
+
+# Auto-detect optimal workers based on CPU cores
+CPU_CORES=$(nproc 2>/dev/null || echo 2)
+WORKERS=${WORKERS:-$((CPU_CORES > 4 ? 4 : CPU_CORES))}
+
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
+echo "⚡ Workers: $WORKERS (CPU cores: $CPU_CORES)"
 echo ""
-echo "📝 Server running with 1 worker (prevents memory exhaustion)..."
+echo "📝 Management commands:"
 echo "   • View logs: tail -f nohup.out"
 echo "   • Stop server: pkill -f 'uvicorn main:app'"
+echo "   • Change workers: export WORKERS=4 && bash setup-runpod.sh"
 echo ""
 
 source venv/bin/activate
-nohup uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 75 --limit-concurrency 100 > nohup.out 2>&1 &
+nohup uvicorn main:app \
+    --host 0.0.0.0 \
+    --port $PORT \
+    --workers $WORKERS \
+    --timeout-keep-alive 75 \
+    --limit-concurrency 100 \
+    --log-level info > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."
@@ -188,8 +201,17 @@ if curl -s http://localhost:$PORT/docs > /dev/null 2>&1; then
     echo "   Docs:   http://localhost:$PORT/docs"
     echo "   RunPod: https://yueihds3xl383a-$PORT.proxy.runpod.net/docs"
     echo ""
+    echo "⚙️  Configuration:"
+    echo "   Workers: $WORKERS processes"
+    echo "   Each worker loads Kokoro model once (GPU/CPU)"
+    echo ""
+    echo "📊 Scale up/down:"
+    echo "   WORKERS=2 bash setup-runpod.sh  # Low traffic"
+    echo "   WORKERS=4 bash setup-runpod.sh  # High traffic"
+    echo ""
     echo "📋 Management:"
     echo "   • View logs: tail -f nohup.out"
+    echo "   • Monitor: ps aux | grep uvicorn"
     echo "   • Stop: pkill -f 'uvicorn main:app'"
     echo ""
 elif ps -p $BACKEND_PID > /dev/null 2>&1; then

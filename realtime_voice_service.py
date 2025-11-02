@@ -10,17 +10,12 @@ import search
 import models
 import httpx
 from neural_tts_service import neural_tts
-from concurrent.futures import ThreadPoolExecutor
 
 OLLAMA_API = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3.2:3b"
 
 CODE_INDICATORS = ['```', 'function', 'class ', 'def ', 'import ', 'const ', 'return ', 'async ', 'SELECT ']
 CODE_KEYWORDS = ['code', 'example', 'how to', 'tutorial', 'syntax', 'implement']
-
-_audio_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="audio")
-_tts_semaphore = asyncio.Semaphore(1)
-TTS_TIMEOUT_SECONDS = 20
 
 async def safe_send_json(ws: WebSocket, data: dict) -> bool:
     if ws.client_state != WebSocketState.CONNECTED:
@@ -61,45 +56,26 @@ def clean_text_for_tts(text: str) -> str:
 
 async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
     try:
-        print(f"🎵 TTS generating: '{text[:50]}...' ({len(text)} chars)")
+        cleaned_text = clean_text_for_tts(text.strip())
+        if not cleaned_text or len(cleaned_text) < 5:
+            return
         
-        async with _tts_semaphore:
-            # Generate audio in thread pool (non-blocking) with timeout guard
-            try:
-                audio_data = await asyncio.wait_for(
-                    neural_tts.generate_speech_async(text, voice=voice_id, language="en"),
-                    timeout=TTS_TIMEOUT_SECONDS
-                )
-            except asyncio.TimeoutError:
-                print(f"⚠️ TTS timed out after {TTS_TIMEOUT_SECONDS}s")
-                await safe_send_json(ws, {
-                    "type": "error",
-                    "message": "Voice response took too long. Continuing with text only."
-                })
-                return
-
-        print(f"✅ TTS generated: {len(audio_data)} bytes")
+        print(f"🎵 TTS: '{cleaned_text[:50]}...' ({len(cleaned_text)} chars)")
         
-        # Audio processing in dedicated thread pool
-        loop = asyncio.get_event_loop()
+        audio_data = await neural_tts.generate_speech_async(cleaned_text, voice=voice_id, language="en")
         
-        def process_audio():
-            audio = AudioSegment.from_wav(BytesIO(audio_data))
-            audio = audio.speedup(playback_speed=1.15).set_channels(1)
-            output = BytesIO()
-            audio.export(output, format="wav")
-            return output.getvalue()
-        
-        print(f"🔄 Processing audio...")
-        audio_bytes = await loop.run_in_executor(_audio_executor, process_audio)
-        print(f"✅ Audio processed: {len(audio_bytes)} bytes")
+        audio = AudioSegment.from_wav(BytesIO(audio_data))
+        audio = audio.speedup(playback_speed=1.15).set_channels(1)
+        output = BytesIO()
+        audio.export(output, format="wav")
+        audio_bytes = output.getvalue()
         
         await safe_send_json(ws, {
             "type": "audio_chunk",
             "audio": base64.b64encode(audio_bytes).decode(),
             "format": "wav"
         })
-        print(f"📤 Audio sent to client")
+        print(f"✅ Audio sent ({len(audio_bytes)} bytes)")
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
 
@@ -127,12 +103,7 @@ Context from knowledge base:
 {context if context else "No relevant context found in the knowledge base."}"""
 
 async def handle_tts_chunk(ws: WebSocket, buffer: str, voice_id: str):
-    text = clean_text_for_tts(buffer.strip())
-    if text and len(text) > 5:
-        print(f"🔊 TTS chunk request: {len(text)} chars")
-        await generate_and_send_audio(ws, text, voice_id)
-    else:
-        print(f"⏭️ Skipping TTS: text too short ({len(text)} chars)")
+    await generate_and_send_audio(ws, buffer, voice_id)
 
 async def handle_voice_chat(websocket: WebSocket, api_key: str):
     await websocket.accept()
@@ -246,20 +217,14 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
                     has_paragraph = display_buffer.count('. ') >= 2 or '\n\n' in display_buffer
                     is_long = len(display_buffer) > 200
                     
-                    # Generate TTS sequentially (wait for completion)
                     if (has_paragraph or is_long) and len(display_buffer.strip()) > 50:
                         if interrupt_flag["interrupted"]:
-                            print("🛑 Processing interrupted before TTS")
                             return
-                        print(f"🎯 Processing TTS chunk ({len(display_buffer)} chars, sentences: {display_buffer.count('. ')})")
                         await handle_tts_chunk(websocket, display_buffer, voice_id)
                         display_buffer = ""
         
-        # Generate final TTS chunk
         if not interrupt_flag["interrupted"] and len(display_buffer.strip()) > 5:
-            text = clean_text_for_tts(display_buffer.strip())
-            if text and len(text) > 5:
-                await generate_and_send_audio(websocket, text, voice_id)
+            await generate_and_send_audio(websocket, display_buffer, voice_id)
         
         if not interrupt_flag["interrupted"]:
             await safe_send_json(websocket, {"type": "response_end"})
