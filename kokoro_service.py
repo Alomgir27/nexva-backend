@@ -32,9 +32,30 @@ class KokoroService:
                 return
 
             try:
-                # Force CPU for stability (no GPU VRAM issues)
-                device = 'cpu'
-                print(f"🚀 Loading Kokoro-82M on CPU (forced for stability)...")
+                # Use GPU if available (max 2 instances fit in 6GB VRAM)
+                import os
+                
+                # Check existing GPU instances
+                gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+                
+                if gpu_count > 0:
+                    try:
+                        current_vram = torch.cuda.memory_allocated(0) / (1024**3)
+                        available_vram = (torch.cuda.get_device_properties(0).total_memory / (1024**3)) - current_vram
+                        
+                        # Only use GPU if >2GB VRAM available
+                        if available_vram > 2.5:
+                            device = 'cuda'
+                            print(f"🚀 Worker {os.getpid()} loading Kokoro-82M on GPU (VRAM: {available_vram:.1f}GB free)...")
+                        else:
+                            device = 'cpu'
+                            print(f"⚠️ Worker {os.getpid()} using CPU (GPU VRAM low: {available_vram:.1f}GB)...")
+                    except:
+                        device = 'cpu'
+                        print(f"🚀 Worker {os.getpid()} loading Kokoro-82M on CPU...")
+                else:
+                    device = 'cpu'
+                    print(f"🚀 Worker {os.getpid()} loading Kokoro-82M on CPU (no GPU)...")
                 
                 self.pipeline = KPipeline(lang_code='a', device=device)
                 self.device = device
@@ -47,7 +68,7 @@ class KokoroService:
                 except:
                     pass
                 
-                print(f"✅ Kokoro-82M ready on CPU")
+                print(f"✅ Kokoro-82M ready on {device}")
             except Exception as e:
                 print(f"❌ Kokoro initialization failed: {e}")
                 self.pipeline = None
