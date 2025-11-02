@@ -66,7 +66,11 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    name: Optional[str] = None
     created_at: datetime
+
+class UserUpdate(BaseModel):
+    name: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -192,6 +196,17 @@ def login(user_data: UserLogin, db: Session = Depends(models.get_db)):
 
 @app.get("/api/auth/me", response_model=UserResponse)
 def get_current_user_info(current_user: models.User = Depends(auth_service.get_current_user)):
+    return current_user
+
+@app.put("/api/auth/me", response_model=UserResponse)
+def update_current_user(
+    user_data: UserUpdate,
+    current_user: models.User = Depends(auth_service.get_current_user),
+    db: Session = Depends(models.get_db)
+):
+    current_user.name = user_data.name
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 # Chatbot Endpoints

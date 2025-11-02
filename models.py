@@ -15,6 +15,7 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
+    name = Column(String(255), nullable=True)
     password_hash = Column(String(255))
     oauth_provider = Column(String(50))
     oauth_id = Column(String(255))

@@ -16,14 +16,15 @@ export const VoiceChat = {
   assistantSpeaking: false,
   pendingTranscript: '',
   assistantTranscript: '',
-  needsRestart: false,
-  restartCallback: null,
+  micStream: null,
+  onTranscriptCallback: null,
+  isEdge: /Edg\//.test(navigator.userAgent),
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
   },
   
-  start: function(onTranscript, continuous = false) {
+  start: async function(onTranscript, continuous = false) {
     if (!this.isSupported()) {
       Messaging.addMessage('system', '❌ Voice input is not supported in your browser. Please use Chrome or Edge.');
       return false;
@@ -34,6 +35,23 @@ export const VoiceChat = {
     }
     
     this.continuousMode = continuous;
+    this.onTranscriptCallback = onTranscript;
+    
+    try {
+      if (!this.micStream) {
+        this.micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1
+          }
+        });
+      }
+    } catch (err) {
+      Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access.');
+      return false;
+    }
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
@@ -96,9 +114,10 @@ export const VoiceChat = {
       const displayText = this.finalTranscript + (interimTranscript ? ' ' + interimTranscript : '');
       const trimmedText = displayText.trim();
 
-      if (this.assistantSpeaking) {
+      if (this.assistantSpeaking && trimmedText) {
         const lowerText = trimmedText.toLowerCase();
         const lowerAssistant = this.assistantTranscript.toLowerCase();
+        
         if (lowerText && lowerAssistant && lowerAssistant.includes(lowerText)) {
           this.pendingTranscript = '';
           if (this.silenceTimer) {
@@ -106,6 +125,11 @@ export const VoiceChat = {
             this.silenceTimer = null;
           }
           return;
+        }
+        
+        if (this.onInterrupt && !this.interruptSent) {
+          this.interruptSent = true;
+          this.onInterrupt();
         }
       }
 
@@ -124,11 +148,6 @@ export const VoiceChat = {
         if (!this.isSpeaking) {
           this.isSpeaking = true;
           this.updateMicrophoneColor(true);
-        }
-        
-        if (this.onInterrupt && !this.interruptSent) {
-          this.interruptSent = true;
-          this.onInterrupt();
         }
       }
       
@@ -162,14 +181,12 @@ export const VoiceChat = {
         flushTranscript();
       }
 
-      const wasRecording = this.isRecording;
       this.isRecording = false;
       this.finalTranscript = '';
       this.pendingTranscript = '';
       this.currentMessageIndex = -1;
       this.messageSent = false;
       this.isSpeaking = false;
-      
       this.updateMicrophoneColor(false);
       
       const indicator = document.getElementById('nexvaVoiceIndicator');
@@ -178,15 +195,6 @@ export const VoiceChat = {
       }
       
       UI.animateHeaderTitle(false, this.originalHeaderTitle);
-      
-      // Auto-restart recognition if in continuous mode
-      if (this.continuousMode && wasRecording && !this.assistantSpeaking) {
-        setTimeout(() => {
-          if (this.continuousMode && !this.assistantSpeaking && this.restartCallback) {
-            this.restartCallback();
-          }
-        }, 800);
-      }
     };
     
     this.recognition.start();
@@ -271,13 +279,22 @@ export const VoiceChat = {
   
   setAssistantSpeaking: function(isSpeaking) {
     this.assistantSpeaking = isSpeaking;
-    
     if (isSpeaking) {
       this.interruptSent = false;
-      // Keep recognition running so user can interrupt by speaking
-      // Don't stop recognition anymore - allow interruption
+      if (this.isEdge && this.recognition) {
+        try {
+          this.recognition.stop();
+        } catch (e) {}
+      }
     } else {
       this.clearAssistantTranscript();
+      if (this.isEdge && this.continuousMode && this.onTranscriptCallback && this.isRecording) {
+        setTimeout(async () => {
+          if (!this.assistantSpeaking && this.continuousMode && this.onTranscriptCallback) {
+            await this.start(this.onTranscriptCallback, true);
+          }
+        }, 300);
+      }
     }
   },
   
@@ -305,6 +322,10 @@ export const VoiceChat = {
       } catch (e) {}
       this.recognition = null;
     }
+    if (this.micStream) {
+      this.micStream.getTracks().forEach(track => track.stop());
+      this.micStream = null;
+    }
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
@@ -316,8 +337,7 @@ export const VoiceChat = {
     this.currentMessageIndex = -1;
     this.messageSent = false;
     this.assistantSpeaking = false;
-    this.needsRestart = false;
-    this.restartCallback = null;
+    this.onTranscriptCallback = null;
     const indicator = document.getElementById('nexvaVoiceIndicator');
     if (indicator) {
       indicator.classList.remove('active');

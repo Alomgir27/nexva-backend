@@ -151,18 +151,20 @@ export const NexvaChat = {
       voicePromptBtn.classList.add('recording');
       
       WebSocketManager.onResponseComplete = () => {
-        if (this.voicePromptActive && VoiceChat.continuousMode) {
-          setTimeout(() => {
-            VoiceChat.start((transcript) => {
+        if (this.voicePromptActive && VoiceChat.continuousMode && !VoiceChat.isRecording) {
+          setTimeout(async () => {
+            await VoiceChat.start((transcript) => {
               this.sendVoiceMessage(transcript);
             }, true);
-          }, 500);
+          }, 300);
         }
       };
       
-      VoiceChat.start((transcript) => {
-        this.sendVoiceMessage(transcript);
-      }, true);
+      (async () => {
+        await VoiceChat.start((transcript) => {
+          this.sendVoiceMessage(transcript);
+        }, true);
+      })();
     }
   },
   
@@ -209,12 +211,14 @@ export const NexvaChat = {
     
     this.voiceChatWs.onopen = () => {
       WebSocketManager.onResponseComplete = () => {
-        if (this.voiceChatActive && VoiceChat.continuousMode) {
-          setTimeout(() => {
-            VoiceChat.start((transcript) => {
-              trySendTranscript(transcript);
-            }, true);
-          }, 500);
+        if (this.voiceChatActive && VoiceChat.continuousMode && !isSending) {
+          setTimeout(async () => {
+            if (!VoiceChat.isRecording) {
+              await VoiceChat.start((transcript) => {
+                trySendTranscript(transcript);
+              }, true);
+            }
+          }, 300);
         }
       };
       
@@ -228,16 +232,11 @@ export const NexvaChat = {
         isSending = false;
       };
       
-      // Set restart callback for mobile
-      VoiceChat.restartCallback = () => {
-        VoiceChat.start((transcript) => {
+      (async () => {
+        await VoiceChat.start((transcript) => {
           trySendTranscript(transcript);
         }, true);
-      };
-      
-      VoiceChat.start((transcript) => {
-        trySendTranscript(transcript);
-      }, true);
+      })();
     };
     
     this.voiceChatWs.onmessage = (event) => {
@@ -246,6 +245,13 @@ export const NexvaChat = {
       if (data.type === "response_start") {
         VoiceChat.interruptSent = false;
         VoiceChat.clearAssistantTranscript();
+        if (!VoiceChat.isRecording && this.voiceChatActive) {
+          (async () => {
+            await VoiceChat.start((transcript) => {
+              trySendTranscript(transcript);
+            }, true);
+          })();
+        }
       } else if (data.type === "text_chunk") {
         VoiceChat.addAssistantTranscriptChunk(data.text);
         Messaging.appendToLastMessage(data.text);
@@ -255,12 +261,7 @@ export const NexvaChat = {
       } else if (data.type === "response_end") {
         Messaging.finalizeMessage();
         VoiceChat.clearAssistantTranscript();
-        if (this.voiceChatActive && WebSocketManager.onResponseComplete) {
-          isSending = false;
-          WebSocketManager.onResponseComplete();
-        } else {
-          isSending = false;
-        }
+        isSending = false;
       } else if (data.type === "error") {
         Messaging.addMessage('system', `❌ ${data.message}`);
         Messaging.hideTyping();
@@ -281,9 +282,6 @@ export const NexvaChat = {
   },
   
   stopVoiceChat: function() {
-    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
-    const voiceStatus = document.getElementById('nexvaVoiceStatus');
-    
     this.voiceChatActive = false;
     WebSocketManager.onResponseComplete = null;
     VoiceChat.onInterrupt = null;
@@ -296,13 +294,18 @@ export const NexvaChat = {
     
     WebSocketManager.stopAllAudio();
     
+    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
+    const voiceStatus = document.getElementById('nexvaVoiceStatus');
+    
+    VoiceChat.stop();
+    
     if (voiceToggleBtn) {
       voiceToggleBtn.classList.remove('recording');
     }
     if (voiceStatus) {
       voiceStatus.textContent = 'Click microphone to start';
+      voiceStatus.style.color = '';
     }
-    VoiceChat.stop();
   },
   
   toggleChat: function() {

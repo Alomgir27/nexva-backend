@@ -122,18 +122,19 @@ export const WebSocketManager = {
       this.isPlayingAudio = false;
       this.currentAudio = null;
       this.updatePlaybackStatus(false);
+      if (this.onResponseComplete) {
+        this.onResponseComplete();
+      }
       return;
     }
 
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
-    
     VoiceChat.interruptSent = false;
     
     const audioData = this.audioQueue.shift();
     const audio = audioData.audio;
     const url = audioData.url;
-    
     this.currentAudio = audio;
     
     audio.onended = () => {
@@ -157,7 +158,11 @@ export const WebSocketManager = {
     const voiceStatus = document.getElementById('nexvaVoiceStatus');
     if (voiceStatus) {
       if (isPlaying) {
-        voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Start speaking to interrupt</span>';
+        if (VoiceChat.isEdge) {
+          voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Assistant speaking...</span>';
+        } else {
+          voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Start speaking to interrupt</span>';
+        }
         voiceStatus.style.color = '#0fdc78';
       } else {
         voiceStatus.textContent = 'Listening...';
