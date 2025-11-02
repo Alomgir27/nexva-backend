@@ -21,6 +21,10 @@ export const VoiceChat = {
   isEdge: /Edg\//.test(navigator.userAgent),
   introAudio: null,
   introSoundPlayed: false,
+  isAndroid: /Android/i.test(navigator.userAgent),
+  restartAttempts: 0,
+  maxRestartAttempts: 5,
+  lastRestartTime: 0,
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
@@ -66,6 +70,11 @@ export const VoiceChat = {
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
+    this.recognition.maxAlternatives = 1;
+    
+    if (this.isAndroid) {
+      this.recognition.interimResults = true;
+    }
     
     this.finalTranscript = '';
     this.pendingTranscript = '';
@@ -172,27 +181,20 @@ export const VoiceChat = {
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
       
       if (trimmedText && !this.messageSent) {
+        const silenceDuration = this.isAndroid ? 3000 : 2000;
         this.silenceTimer = setTimeout(() => {
           flushTranscript();
-        }, 2000);
+        }, silenceDuration);
       }
     };
     
     this.recognition.onerror = (event) => {
-      console.log('Speech recognition error:', event.error);
-      
       if (event.error === 'no-speech' || event.error === 'aborted') {
         return;
       }
       
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access in your browser settings.');
-        this.cleanup();
-        return;
-      }
-      
-      if (event.error === 'network') {
-        Messaging.addMessage('system', '❌ Network error. Please check your internet connection.');
+      if (event.error === 'not-allowed') {
+        Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access.');
         this.cleanup();
         return;
       }
@@ -200,7 +202,6 @@ export const VoiceChat = {
       if (this.currentMessageIndex >= 0) {
         this.removeUserMessage();
       }
-      Messaging.addMessage('system', '❌ Voice recognition error. Please try again.');
       this.cleanup();
     };
     
@@ -228,6 +229,39 @@ export const VoiceChat = {
       }
       
       UI.animateHeaderTitle(false, this.originalHeaderTitle);
+      
+      if (this.continuousMode && this.onTranscriptCallback) {
+        const now = Date.now();
+        if (now - this.lastRestartTime > 500 && this.restartAttempts < this.maxRestartAttempts) {
+          this.lastRestartTime = now;
+          this.restartAttempts++;
+          
+          setTimeout(() => {
+            if (this.continuousMode && this.onTranscriptCallback) {
+              try {
+                this.recognition.start();
+                this.isRecording = true;
+              } catch (e) {
+                console.error('Failed to restart recognition:', e);
+                this.restartAttempts = 0;
+              }
+            }
+          }, this.isAndroid ? 300 : 100);
+        } else if (this.restartAttempts >= this.maxRestartAttempts) {
+          this.restartAttempts = 0;
+          setTimeout(() => {
+            if (this.continuousMode && this.onTranscriptCallback) {
+              this.restartAttempts = 0;
+              try {
+                this.recognition.start();
+                this.isRecording = true;
+              } catch (e) {
+                console.error('Failed to restart recognition after reset:', e);
+              }
+            }
+          }, 1000);
+        }
+      }
     };
     
     this.recognition.start();
@@ -342,6 +376,9 @@ export const VoiceChat = {
   
   stop: function() {
     this.continuousMode = false;
+    this.onTranscriptCallback = null;
+    this.restartAttempts = 0;
+    this.lastRestartTime = 0;
     if (this.currentMessageIndex >= 0) {
       this.removeUserMessage();
     }
@@ -372,6 +409,8 @@ export const VoiceChat = {
     this.assistantSpeaking = false;
     this.onTranscriptCallback = null;
     this.introSoundPlayed = false;
+    this.restartAttempts = 0;
+    this.lastRestartTime = 0;
     const indicator = document.getElementById('nexvaVoiceIndicator');
     if (indicator) {
       indicator.classList.remove('active');

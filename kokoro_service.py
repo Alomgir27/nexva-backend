@@ -4,9 +4,11 @@ import soundfile as sf
 from io import BytesIO
 import torch
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 _model_instance = None
 _model_init_lock = asyncio.Lock()
+_tts_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="kokoro_tts")
 
 
 class KokoroService:
@@ -35,7 +37,7 @@ class KokoroService:
                 device = 'cuda' if torch.cuda.is_available() else 'cpu'
                 print(f"🚀 Loading Kokoro-82M on {device.upper()}...")
                 self.pipeline = await loop.run_in_executor(
-                    None, lambda: KPipeline(lang_code='a', device=device)
+                    _tts_executor, lambda: KPipeline(lang_code='a', device=device)
                 )
                 self.device = device
                 _model_instance = self.pipeline
@@ -59,7 +61,7 @@ class KokoroService:
         
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None,
+            _tts_executor,
             self._generate_audio,
             text,
             voice_id or voice
@@ -111,7 +113,7 @@ async def preload_kokoro():
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             print(f"🚀 Loading Kokoro-82M on {device.upper()}...")
             _model_instance = await loop.run_in_executor(
-                None, lambda: KPipeline(lang_code='a', device=device)
+                _tts_executor, lambda: KPipeline(lang_code='a', device=device)
             )
             print(f"✅ Kokoro-82M loaded on {device.upper()} (82M params)")
         except Exception as e:
