@@ -255,6 +255,9 @@ def delete_chatbot(
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
+    # Delete support tickets first (before conversations due to FK)
+    db.query(models.SupportTicket).filter(models.SupportTicket.chatbot_id == chatbot_id).delete()
+    
     # Delete messages for all conversations
     conversations = db.query(models.Conversation).filter(models.Conversation.chatbot_id == chatbot_id).all()
     for conv in conversations:
@@ -263,13 +266,10 @@ def delete_chatbot(
     # Delete conversations
     db.query(models.Conversation).filter(models.Conversation.chatbot_id == chatbot_id).delete()
     
-    # Delete support tickets
-    db.query(models.SupportTicket).filter(models.SupportTicket.chatbot_id == chatbot_id).delete()
-    
     # Delete support team members
     db.query(models.SupportTeamMember).filter(models.SupportTeamMember.chatbot_id == chatbot_id).delete()
     
-    # Delete scraped pages and documents for all domains
+    # Delete scraped pages, documents, and jobs for all domains
     domains = db.query(models.Domain).filter(models.Domain.chatbot_id == chatbot_id).all()
     for domain in domains:
         db.query(models.ScrapedPage).filter(models.ScrapedPage.domain_id == domain.id).delete()
@@ -282,8 +282,8 @@ def delete_chatbot(
     # Delete Elasticsearch index
     try:
         search.es.indices.delete(index=search.get_chatbot_index(chatbot_id), ignore=[404])
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning: Could not delete ES index for chatbot {chatbot_id}: {e}")
     
     # Delete chatbot
     db.delete(chatbot)
