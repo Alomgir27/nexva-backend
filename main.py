@@ -27,8 +27,6 @@ import shutil
 import secrets
 from r2_service import r2_service
 
-from neural_tts_service import neural_tts
-
 scrape_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="scraper")
 
 @asynccontextmanager
@@ -41,6 +39,10 @@ async def lifespan(app: FastAPI):
         
         from kokoro_service import preload_kokoro
         await preload_kokoro()
+        
+        # Import neural_tts after kokoro is loaded
+        global neural_tts
+        from neural_tts_service import neural_tts
         
         print("✅ All models loaded and ready", flush=True)
     except Exception as e:
