@@ -1,3 +1,6 @@
+import sys
+sys.stdout.reconfigure(line_buffering=True)  # Unbuffered logging
+
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware

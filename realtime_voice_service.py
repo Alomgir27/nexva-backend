@@ -59,10 +59,11 @@ def clean_text_for_tts(text: str) -> str:
 
 async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
     try:
-        print(f"🎵 TTS: '{text[:50]}...' ({len(text)} chars)")
+        print(f"🎵 TTS generating: '{text[:50]}...' ({len(text)} chars)")
         
         # Generate audio in thread pool (non-blocking)
         audio_data = await neural_tts.generate_speech_async(text, voice=voice_id, language="en")
+        print(f"✅ TTS generated: {len(audio_data)} bytes")
         
         # Audio processing in dedicated thread pool
         loop = asyncio.get_event_loop()
@@ -74,14 +75,16 @@ async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
             audio.export(output, format="wav")
             return output.getvalue()
         
+        print(f"🔄 Processing audio...")
         audio_bytes = await loop.run_in_executor(_audio_executor, process_audio)
+        print(f"✅ Audio processed: {len(audio_bytes)} bytes")
         
         await safe_send_json(ws, {
             "type": "audio_chunk",
             "audio": base64.b64encode(audio_bytes).decode(),
             "format": "wav"
         })
-        print(f"✅ Audio sent: {len(audio_bytes)} bytes")
+        print(f"📤 Audio sent to client")
     except Exception as e:
         print(f"⚠️ TTS error: {e}")
 
@@ -111,7 +114,10 @@ Context from knowledge base:
 async def handle_tts_chunk(ws: WebSocket, buffer: str, voice_id: str):
     text = clean_text_for_tts(buffer.strip())
     if text and len(text) > 5:
+        print(f"🔊 TTS chunk request: {len(text)} chars")
         await generate_and_send_audio(ws, text, voice_id)
+    else:
+        print(f"⏭️ Skipping TTS: text too short ({len(text)} chars)")
 
 async def handle_voice_chat(websocket: WebSocket, api_key: str):
     await websocket.accept()
@@ -184,6 +190,8 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
     
     try:
         print(f"💬 Query: '{text_query}'")
+        
+        # Search with async embedding
         results = await search.search_chatbot_content(chatbot.id, text_query, max_results=5)
         print(f"🔍 Found {len(results) if results else 0} results")
         
@@ -196,6 +204,7 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
         display_buffer = ""
         voice_id = getattr(chatbot, 'voice_id', 'female-1')
         print(f"🎤 Using voice: {voice_id}")
+        print(f"🤖 Starting LLM stream...")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             async with client.stream("POST", OLLAMA_API, 
