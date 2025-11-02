@@ -21,7 +21,6 @@ export const VoiceChat = {
   isEdge: /Edg\//.test(navigator.userAgent),
   introAudio: null,
   introSoundPlayed: false,
-  isAndroid: /Android/i.test(navigator.userAgent),
   restartAttempts: 0,
   maxRestartAttempts: 5,
   lastRestartTime: 0,
@@ -72,10 +71,6 @@ export const VoiceChat = {
     this.recognition.lang = 'en-US';
     this.recognition.maxAlternatives = 1;
     
-    if (this.isAndroid) {
-      this.recognition.interimResults = true;
-    }
-    
     this.finalTranscript = '';
     this.pendingTranscript = '';
     this.assistantTranscript = '';
@@ -103,7 +98,10 @@ export const VoiceChat = {
 
     this.recognition.onstart = () => {
       this.isRecording = true;
-      document.getElementById('nexvaVoiceIndicator').classList.add('active');
+      const indicator = document.getElementById('nexvaVoiceIndicator');
+      if (indicator) {
+        indicator.classList.add('active');
+      }
       
       if (!this.originalHeaderTitle) {
         const titleElement = document.querySelector('.nexva-chat-header-title h3');
@@ -114,16 +112,6 @@ export const VoiceChat = {
       
       UI.animateHeaderTitle(true, this.originalHeaderTitle);
       this.setListeningEffect();
-      
-      const config = window.NexvaChat?.config;
-      if (playIntro && config && config.enableIntroSound && !this.introSoundPlayed) {
-        this.introSoundPlayed = true;
-        if (!this.introAudio) {
-          this.introAudio = new Audio(`${config.apiUrl}/intro.wav`);
-          this.introAudio.volume = 0.7;
-        }
-        this.introAudio.play().catch(() => {});
-      }
     };
     
     this.recognition.onresult = (event) => {
@@ -181,10 +169,9 @@ export const VoiceChat = {
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
       
       if (trimmedText && !this.messageSent) {
-        const silenceDuration = this.isAndroid ? 3000 : 2000;
         this.silenceTimer = setTimeout(() => {
           flushTranscript();
-        }, silenceDuration);
+        }, 2000);
       }
     };
     
@@ -242,11 +229,10 @@ export const VoiceChat = {
                 this.recognition.start();
                 this.isRecording = true;
               } catch (e) {
-                console.error('Failed to restart recognition:', e);
                 this.restartAttempts = 0;
               }
             }
-          }, this.isAndroid ? 300 : 100);
+          }, 100);
         } else if (this.restartAttempts >= this.maxRestartAttempts) {
           this.restartAttempts = 0;
           setTimeout(() => {
@@ -255,16 +241,36 @@ export const VoiceChat = {
               try {
                 this.recognition.start();
                 this.isRecording = true;
-              } catch (e) {
-                console.error('Failed to restart recognition after reset:', e);
-              }
+              } catch (e) {}
             }
           }, 1000);
         }
       }
     };
     
-    this.recognition.start();
+    const config = window.NexvaChat?.config;
+    if (playIntro && config && config.enableIntroSound && !this.introSoundPlayed) {
+      this.introSoundPlayed = true;
+      if (!this.introAudio) {
+        this.introAudio = new Audio(`${config.apiUrl}/intro.wav`);
+        this.introAudio.volume = 0.7;
+      }
+      
+      this.introAudio.onended = () => {
+        this.recognition.start();
+      };
+      
+      this.introAudio.onerror = () => {
+        this.recognition.start();
+      };
+      
+      this.introAudio.play().catch(() => {
+        this.recognition.start();
+      });
+    } else {
+      this.recognition.start();
+    }
+    
     return true;
   },
   

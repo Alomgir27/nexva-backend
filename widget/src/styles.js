@@ -285,25 +285,30 @@ export const Styles = {
       @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
       @media (max-width: 480px) { 
         .nexva-chat-container { 
-          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
-          ${position.includes('bottom') ? 'bottom: 10px;' : 'top: 10px;'}
+          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
+          ${position.includes('bottom') ? 'bottom: 15px;' : 'top: 15px;'}
+        }
+        .nexva-chat-button {
+          width: 56px;
+          height: 56px;
         }
         .nexva-chat-window { 
-          width: calc(100vw - 20px); 
-          height: calc(100vh - 80px);
-          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
-          ${position.includes('bottom') ? 'bottom: 70px;' : 'top: 70px;'}
+          width: calc(100vw - 30px); 
+          height: calc(100vh - 90px);
+          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
+          ${position.includes('bottom') ? 'bottom: 80px;' : 'top: 80px;'}
+          max-width: 100vw;
         } 
         .nexva-notification-bubble {
-          ${position.includes('right') ? 'right: 10px;' : 'left: 10px;'}
-          ${position.includes('bottom') ? 'bottom: ' + (parseInt(bubbleSize) + 20) + 'px;' : 'top: ' + (parseInt(bubbleSize) + 20) + 'px;'}
-          max-width: calc(100vw - 80px);
+          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
+          ${position.includes('bottom') ? 'bottom: 85px;' : 'top: 85px;'}
+          max-width: calc(100vw - 90px);
         }
         .nexva-mode-switcher-container { display: none; }
         .nexva-chat-tabs { flex: 1; }
-        .nexva-chat-message-content { max-width: 85%; }
+        .nexva-chat-message-content { max-width: 90%; }
         .nexva-chat-messages { padding: 16px 12px; }
-        .nexva-chat-input-area { padding: 12px 16px; }
+        .nexva-chat-input-area { padding: 12px 14px; }
       }
       .nexva-chat-messages::-webkit-scrollbar { width: 6px; }
       .nexva-chat-messages::-webkit-scrollbar-track { background: transparent; }
