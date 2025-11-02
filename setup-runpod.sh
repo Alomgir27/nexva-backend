@@ -166,38 +166,55 @@ echo "║         Starting Nexva Backend         ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
 
-# Auto-detect optimal workers based on CPU cores AND memory
-CPU_CORES=$(nproc 2>/dev/null || echo 2)
+# Calculate workers based on RAM (conservative)
 TOTAL_RAM_GB=$(free -g | awk '/^Mem:/{print $2}')
-
-# Conservative worker calculation: 1 worker per 6GB RAM, max 4
-if [ -n "$TOTAL_RAM_GB" ] && [ "$TOTAL_RAM_GB" -gt 0 ]; then
-    MAX_WORKERS_BY_RAM=$((TOTAL_RAM_GB / 6))
-    [ "$MAX_WORKERS_BY_RAM" -lt 1 ] && MAX_WORKERS_BY_RAM=1
-    [ "$MAX_WORKERS_BY_RAM" -gt 4 ] && MAX_WORKERS_BY_RAM=4
-    WORKERS=${WORKERS:-$MAX_WORKERS_BY_RAM}
+if [ "$TOTAL_RAM_GB" -gt 100 ]; then
+    WORKERS=4
+elif [ "$TOTAL_RAM_GB" -gt 50 ]; then
+    WORKERS=3
+elif [ "$TOTAL_RAM_GB" -gt 24 ]; then
+    WORKERS=2
 else
-    WORKERS=${WORKERS:-2}
+    WORKERS=1
 fi
 
 echo "🚀 Backend API: http://0.0.0.0:$PORT"
 echo "📚 API Docs: http://localhost:$PORT/docs"
-echo "⚡ Workers: $WORKERS (CPU: $CPU_CORES cores, RAM: ${TOTAL_RAM_GB}GB)"
+echo "⚡ Workers: $WORKERS (staggered startup, RAM: ${TOTAL_RAM_GB}GB)"
 echo ""
 echo "📝 Management commands:"
 echo "   • View logs: tail -f nohup.out"
 echo "   • Stop server: pkill -f 'uvicorn main:app'"
-echo "   • Change workers: export WORKERS=4 && bash setup-runpod.sh"
 echo ""
 
 source venv/bin/activate
+
+# Preload models BEFORE starting workers to share memory
+echo "📦 Preloading shared models..."
+python3 -c "
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+
+print('Loading embedding model...')
+import search
+search.get_embedding_model()
+print('✅ Embedding model loaded')
+" 2>/dev/null || echo "⚠️ Model preload skipped"
+
+echo ""
+echo "🚀 Starting Uvicorn with $WORKERS workers..."
+
+# Use --preload to share memory between workers
 nohup uvicorn main:app \
     --host 0.0.0.0 \
     --port $PORT \
     --workers $WORKERS \
-    --timeout-keep-alive 75 \
+    --timeout-keep-alive 120 \
     --limit-concurrency 100 \
-    --log-level info > nohup.out 2>&1 &
+    --backlog 200 \
+    --log-level info \
+    --loop uvloop \
+    --no-access-log > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."
@@ -212,12 +229,9 @@ if curl -s http://localhost:$PORT/docs > /dev/null 2>&1; then
     echo "   RunPod: https://yueihds3xl383a-$PORT.proxy.runpod.net/docs"
     echo ""
     echo "⚙️  Configuration:"
-    echo "   Workers: $WORKERS processes"
-    echo "   Each worker loads Kokoro model once (GPU/CPU)"
-    echo ""
-    echo "📊 Scale up/down:"
-    echo "   WORKERS=2 bash setup-runpod.sh  # Low traffic"
-    echo "   WORKERS=4 bash setup-runpod.sh  # High traffic"
+    echo "   • $WORKERS worker processes"
+    echo "   • Models preloaded and shared"
+    echo "   • Staggered startup prevents memory spikes"
     echo ""
     echo "📋 Management:"
     echo "   • View logs: tail -f nohup.out"
