@@ -202,8 +202,8 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
-        if conversation_id and conversation_id in manager.conversation_connections:
-            del manager.conversation_connections[conversation_id]
+        if conversation and conversation.id in manager.conversation_connections:
+            del manager.conversation_connections[conversation.id]
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()

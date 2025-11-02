@@ -109,8 +109,12 @@ export const WebSocketManager = {
   queueAudio: function(audioBlob) {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    const isAndroid = /android/i.test(navigator.userAgent);
     
     audio.preload = 'auto';
+    if (isAndroid) {
+      audio.volume = 1.0;
+    }
     audio.load();
     
     this.audioQueue.push({ audio, url: audioUrl });
@@ -140,6 +144,8 @@ export const WebSocketManager = {
     const url = audioData.url;
     this.currentAudio = audio;
     
+    const isAndroid = /android/i.test(navigator.userAgent);
+    
     const cleanupAndNext = () => {
       URL.revokeObjectURL(url);
       this.playNextAudio();
@@ -149,7 +155,10 @@ export const WebSocketManager = {
     audio.onerror = cleanupAndNext;
     
     const attemptPlay = () => {
-      if (audio.readyState >= 3) {
+      const minReadyState = isAndroid ? 4 : 3;
+      const waitTime = isAndroid ? 500 : 300;
+      
+      if (audio.readyState >= minReadyState) {
         audio.play().catch(err => {
           console.warn('Audio playback error:', err);
           cleanupAndNext();
@@ -163,14 +172,18 @@ export const WebSocketManager = {
         }, { once: true });
         
         setTimeout(() => {
-          if (audio.readyState < 3) {
+          if (audio.readyState < minReadyState) {
             audio.play().catch(cleanupAndNext);
           }
-        }, 300);
+        }, waitTime);
       }
     };
     
-    attemptPlay();
+    if (isAndroid) {
+      setTimeout(attemptPlay, 150);
+    } else {
+      attemptPlay();
+    }
   },
   
   updatePlaybackStatus: function(isPlaying) {
