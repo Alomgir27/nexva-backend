@@ -87,6 +87,12 @@ export const VoiceChat = {
         indicator.classList.add('active');
       }
       
+      const voiceStatus = document.getElementById('nexvaVoiceStatus');
+      if (voiceStatus && voiceStatus.textContent === 'Loading...') {
+        voiceStatus.textContent = 'Listening...';
+        voiceStatus.style.color = '';
+      }
+      
       if (!this.originalHeaderTitle) {
         const titleElement = document.querySelector('.nexva-chat-header-title h3');
         if (titleElement) {
@@ -338,19 +344,19 @@ export const VoiceChat = {
     this.assistantSpeaking = isSpeaking;
     if (isSpeaking) {
       this.interruptSent = false;
-      if (this.isEdge && this.recognition) {
+      if (this.recognition && (this.isEdge || /android/i.test(navigator.userAgent))) {
         try {
           this.recognition.stop();
         } catch (e) {}
       }
     } else {
       this.clearAssistantTranscript();
-      if (this.isEdge && this.continuousMode && this.onTranscriptCallback && this.isRecording) {
+      if ((this.isEdge || /android/i.test(navigator.userAgent)) && this.continuousMode && this.onTranscriptCallback) {
         setTimeout(async () => {
           if (!this.assistantSpeaking && this.continuousMode && this.onTranscriptCallback) {
             await this.start(this.onTranscriptCallback, true);
           }
-        }, 300);
+        }, 500);
       }
     }
   },

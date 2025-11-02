@@ -189,7 +189,8 @@ export const NexvaChat = {
     
     this.voiceChatActive = true;
     voiceToggleBtn.classList.add('recording');
-    voiceStatus.textContent = 'Listening...';
+    voiceStatus.textContent = 'Loading...';
+    voiceStatus.style.color = '#fbbf24';
     
     const protocol = this.config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = this.config.apiUrl.replace(/^https?:\/\//, '');

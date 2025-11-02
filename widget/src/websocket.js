@@ -110,6 +110,9 @@ export const WebSocketManager = {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     
+    audio.preload = 'auto';
+    audio.load();
+    
     this.audioQueue.push({ audio, url: audioUrl });
     
     if (!this.isPlayingAudio) {
@@ -137,20 +140,37 @@ export const WebSocketManager = {
     const url = audioData.url;
     this.currentAudio = audio;
     
-    audio.onended = () => {
+    const cleanupAndNext = () => {
       URL.revokeObjectURL(url);
       this.playNextAudio();
     };
     
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      this.playNextAudio();
+    audio.onended = cleanupAndNext;
+    audio.onerror = cleanupAndNext;
+    
+    const attemptPlay = () => {
+      if (audio.readyState >= 3) {
+        audio.play().catch(err => {
+          console.warn('Audio playback error:', err);
+          cleanupAndNext();
+        });
+      } else {
+        audio.addEventListener('canplaythrough', () => {
+          audio.play().catch(err => {
+            console.warn('Audio playback error:', err);
+            cleanupAndNext();
+          });
+        }, { once: true });
+        
+        setTimeout(() => {
+          if (audio.readyState < 3) {
+            audio.play().catch(cleanupAndNext);
+          }
+        }, 300);
+      }
     };
     
-    audio.play().catch(err => {
-      URL.revokeObjectURL(url);
-      this.playNextAudio();
-    });
+    attemptPlay();
   },
   
   updatePlaybackStatus: function(isPlaying) {
