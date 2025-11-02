@@ -75,6 +75,7 @@ class WebScraper:
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
                 options.add_argument('--disable-gpu')
+                options.add_argument('--single-process')
                 options.add_argument('--disable-blink-features=AutomationControlled')
                 options.add_argument('--disable-extensions')
                 options.add_argument('--disable-logging')
@@ -82,6 +83,8 @@ class WebScraper:
                 options.add_argument('--disable-software-rasterizer')
                 options.add_argument('--disable-images')
                 options.add_argument('--blink-settings=imagesEnabled=false')
+                options.add_argument('--memory-pressure-off')
+                options.add_argument('--max-old-space-size=512')
                 options.add_argument(f'--remote-debugging-port={port}')
                 options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
                 options.page_load_strategy = 'normal'
