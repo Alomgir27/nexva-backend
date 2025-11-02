@@ -56,12 +56,12 @@ export const UI = {
             <h3>${config.headerText}</h3>
           </div>
           <div class="nexva-chat-header-actions">
-            <button class="nexva-chat-icon-btn" id="nexvaDock" aria-label="Dock" title="Dock">
+            ${config.enableDock ? `<button class="nexva-chat-icon-btn" id="nexvaDock" aria-label="Dock" title="Dock">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM3 19V5h11v14H3zm18 0h-5V5h5v14z"/></svg>
-            </button>
-            <button class="nexva-chat-icon-btn" id="nexvaFullscreen" aria-label="Maximize" title="Maximize">
+            </button>` : ''}
+            ${config.enableFullscreen ? `<button class="nexva-chat-icon-btn" id="nexvaFullscreen" aria-label="Maximize" title="Maximize">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-            </button>
+            </button>` : ''}
             <button class="nexva-chat-icon-btn nexva-chat-close" id="nexvaChatClose" aria-label="Close" title="Close">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
