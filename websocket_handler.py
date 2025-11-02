@@ -99,6 +99,15 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             manager.conversation_connections[conversation.id] = websocket
             print(f"[WebSocket] Conversation {conversation.id} reconnected, mode: {conversation.mode}, active: {list(manager.conversation_connections.keys())}")
             
+            if conversation.ticket_id:
+                ticket = db.query(models.SupportTicket).filter(
+                    models.SupportTicket.id == conversation.ticket_id
+                ).first()
+                if ticket and ticket.conversation_id != conversation.id:
+                    print(f"[WebSocket] Updating ticket {ticket.id} conversation_id from {ticket.conversation_id} to {conversation.id}")
+                    ticket.conversation_id = conversation.id
+                    db.commit()
+            
             messages = db.query(models.Message).filter(
                 models.Message.conversation_id == conversation_id
             ).order_by(models.Message.created_at.desc()).limit(10).all()
