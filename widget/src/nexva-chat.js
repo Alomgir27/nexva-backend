@@ -155,7 +155,7 @@ export const NexvaChat = {
           setTimeout(async () => {
             await VoiceChat.start((transcript) => {
               this.sendVoiceMessage(transcript);
-            }, true);
+            }, true, false);
           }, 300);
         }
       };
@@ -163,7 +163,7 @@ export const NexvaChat = {
       (async () => {
         await VoiceChat.start((transcript) => {
           this.sendVoiceMessage(transcript);
-        }, true);
+        }, true, false);
       })();
     }
   },
@@ -216,7 +216,7 @@ export const NexvaChat = {
             if (!VoiceChat.isRecording) {
               await VoiceChat.start((transcript) => {
                 trySendTranscript(transcript);
-              }, true);
+              }, true, true);
             }
           }, 300);
         }
@@ -235,7 +235,7 @@ export const NexvaChat = {
       (async () => {
         await VoiceChat.start((transcript) => {
           trySendTranscript(transcript);
-        }, true);
+        }, true, true);
       })();
     };
     
@@ -249,7 +249,7 @@ export const NexvaChat = {
           (async () => {
             await VoiceChat.start((transcript) => {
               trySendTranscript(transcript);
-            }, true);
+            }, true, true);
           })();
         }
       } else if (data.type === "text_chunk") {

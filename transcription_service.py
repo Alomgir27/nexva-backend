@@ -16,7 +16,9 @@ def get_whisper_model() -> WhisperModel:
     if _whisper_model is None:
         with _whisper_lock:
             if _whisper_model is None:
+                print("🚀 Loading Whisper on CPU...")
                 _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+                print("✅ Whisper loaded on CPU")
     return _whisper_model
 
 def transcribe_audio_file(audio_path: str, language: str = None) -> str:

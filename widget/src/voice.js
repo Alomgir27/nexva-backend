@@ -26,7 +26,7 @@ export const VoiceChat = {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
   },
   
-  start: async function(onTranscript, continuous = false) {
+  start: async function(onTranscript, continuous = false, playIntro = false) {
     if (!this.isSupported()) {
       Messaging.addMessage('system', '❌ Voice input is not supported in your browser. Please use Chrome or Edge.');
       return false;
@@ -101,7 +101,7 @@ export const VoiceChat = {
       this.setListeningEffect();
       
       const config = window.NexvaChat?.config;
-      if (config && config.enableIntroSound && !this.introSoundPlayed) {
+      if (playIntro && config && config.enableIntroSound && !this.introSoundPlayed) {
         this.introSoundPlayed = true;
         if (!this.introAudio) {
           this.introAudio = new Audio(`${config.apiUrl}/intro.wav`);

@@ -4,9 +4,11 @@ import soundfile as sf
 from io import BytesIO
 import torch
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 _model_instance = None
 _model_init_lock = asyncio.Lock()
+_tts_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="tts")
 
 
 class KokoroService:
@@ -31,19 +33,6 @@ class KokoroService:
 
             loop = asyncio.get_event_loop()
             try:
-                if torch.cuda.is_available():
-                    self.device = 'cuda'
-                    print("🚀 Loading Kokoro-82M on GPU...")
-                    self.pipeline = await loop.run_in_executor(
-                        None, lambda: KPipeline(lang_code='a', device='cuda')
-                    )
-                    _model_instance = self.pipeline
-                    print("✅ Kokoro-82M loaded on GPU (82M params)")
-                    return
-            except Exception as e:
-                print(f"⚠️ GPU loading failed, falling back to CPU: {e}")
-
-            try:
                 self.device = 'cpu'
                 print("🚀 Loading Kokoro-82M on CPU...")
                 self.pipeline = await loop.run_in_executor(
@@ -63,13 +52,14 @@ class KokoroService:
         language: str = "en",
         voice_id: str = None
     ):
-        await self._ensure_model()
         if not self.pipeline:
-            raise Exception("Kokoro model not initialized")
+            await self._ensure_model()
+            if not self.pipeline:
+                raise Exception("Kokoro model not initialized")
         
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None,
+            _tts_executor,
             self._generate_audio,
             text,
             voice_id or voice
@@ -118,18 +108,11 @@ async def preload_kokoro():
     if _model_instance is None:
         loop = asyncio.get_event_loop()
         try:
-            if torch.cuda.is_available():
-                print("🚀 Loading Kokoro-82M on GPU...")
-                _model_instance = await loop.run_in_executor(
-                    None, lambda: KPipeline(lang_code='a', device='cuda')
-                )
-                print("✅ Kokoro-82M loaded on GPU (82M params)")
-            else:
-                print("🚀 Loading Kokoro-82M on CPU...")
-                _model_instance = await loop.run_in_executor(
-                    None, lambda: KPipeline(lang_code='a', device='cpu')
-                )
-                print("✅ Kokoro-82M loaded on CPU (82M params)")
+            print("🚀 Loading Kokoro-82M on CPU...")
+            _model_instance = await loop.run_in_executor(
+                None, lambda: KPipeline(lang_code='a', device='cpu')
+            )
+            print("✅ Kokoro-82M loaded on CPU (82M params)")
         except Exception as e:
             print(f"❌ Kokoro preload failed: {e}")
     

@@ -16,9 +16,9 @@ def get_embedding_model():
     """Lazy load the embedding model to save memory at startup"""
     global _embedding_model
     if _embedding_model is None:
-        print("📦 Loading embedding model (all-MiniLM-L6-v2)...")
-        _embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("✅ Embedding model loaded")
+        print("📦 Loading embedding model (all-MiniLM-L6-v2) on CPU...")
+        _embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+        print("✅ Embedding model loaded on CPU")
     return _embedding_model
 
 def init_elasticsearch():
