@@ -11,27 +11,43 @@ export const WebSocketManager = {
   sessionId: null,
   apiKey: null,
   onSupportMessage: null,
+  config: null,
+  onConversationUpdate: null,
+  reconnectAttempts: 0,
+  maxReconnectAttempts: 10,
+  reconnectDelay: 2000,
+  reconnectTimer: null,
+  isManualClose: false,
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     
+    this.config = config;
+    this.onConversationUpdate = onConversationUpdate;
     this.apiKey = config.apiKey;
     this.sessionId = Utils.getOrCreateSessionId(config.apiKey);
-    
-    const protocol = config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const host = config.apiUrl.replace(/^https?:\/\//, '');
-    this.ws = new WebSocket(`${protocol}//${host}/ws/chat/${config.apiKey}`);
+    this.isManualClose = false;
     
     if (existingConversationId) {
       this.conversationId = existingConversationId;
     }
     
+    const protocol = config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const host = config.apiUrl.replace(/^https?:\/\//, '');
+    this.ws = new WebSocket(`${protocol}//${host}/ws/chat/${config.apiKey}`);
+    
     this.ws.onopen = () => {
+      this.reconnectAttempts = 0;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      
       const initMessage = {
         session_id: this.sessionId
       };
-      if (existingConversationId) {
-        initMessage.conversation_id = existingConversationId;
+      if (this.conversationId) {
+        initMessage.conversation_id = this.conversationId;
       }
       this.ws.send(JSON.stringify(initMessage));
     };
@@ -80,11 +96,23 @@ export const WebSocketManager = {
     };
     
     this.ws.onerror = (error) => {
-      Messaging.addMessage('system', '❌ Connection error. Please try again.');
+      console.error('[WebSocket] Error:', error);
     };
     
     this.ws.onclose = () => {
       this.ws = null;
+      
+      if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        const delay = this.reconnectDelay * this.reconnectAttempts;
+        console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        
+        this.reconnectTimer = setTimeout(() => {
+          if (this.config && this.apiKey) {
+            this.connect(this.config, this.onConversationUpdate, this.conversationId);
+          }
+        }, delay);
+      }
     };
   },
   
@@ -100,6 +128,11 @@ export const WebSocketManager = {
   },
   
   close: function() {
+    this.isManualClose = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
