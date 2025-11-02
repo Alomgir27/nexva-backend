@@ -91,9 +91,10 @@ EOF
     rm -f /etc/elasticsearch/elasticsearch.keystore 2>/dev/null || true
     sysctl -w vm.max_map_count=262144 >/dev/null 2>&1 || true
     
-    echo "   🚀 Starting Elasticsearch..."
-    runuser -u elasticsearch -- /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid 2>/dev/null || \
-    su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk /usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null
+    echo "   🚀 Starting Elasticsearch (memory limited for RunPod)..."
+    export ES_JAVA_OPTS="-Xms2g -Xmx4g"
+    runuser -u elasticsearch -- env ES_JAVA_OPTS="-Xms2g -Xmx4g" /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid 2>/dev/null || \
+    su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk ES_JAVA_OPTS='-Xms2g -Xmx4g' /usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null
     
     echo "   Waiting for Elasticsearch..."
     for i in {1..20}; do
