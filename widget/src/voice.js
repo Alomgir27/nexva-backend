@@ -42,22 +42,6 @@ export const VoiceChat = {
     this.continuousMode = continuous;
     this.onTranscriptCallback = onTranscript;
     
-    try {
-      if (!this.micStream) {
-        this.micStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            channelCount: 1
-          }
-        });
-      }
-    } catch (err) {
-      Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access.');
-      return false;
-    }
-    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {

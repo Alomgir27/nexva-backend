@@ -19,6 +19,8 @@ CODE_INDICATORS = ['```', 'function', 'class ', 'def ', 'import ', 'const ', 're
 CODE_KEYWORDS = ['code', 'example', 'how to', 'tutorial', 'syntax', 'implement']
 
 _audio_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="audio")
+_tts_semaphore = asyncio.Semaphore(1)
+TTS_TIMEOUT_SECONDS = 20
 
 async def safe_send_json(ws: WebSocket, data: dict) -> bool:
     if ws.client_state != WebSocketState.CONNECTED:
@@ -61,8 +63,21 @@ async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
     try:
         print(f"🎵 TTS generating: '{text[:50]}...' ({len(text)} chars)")
         
-        # Generate audio in thread pool (non-blocking)
-        audio_data = await neural_tts.generate_speech_async(text, voice=voice_id, language="en")
+        async with _tts_semaphore:
+            # Generate audio in thread pool (non-blocking) with timeout guard
+            try:
+                audio_data = await asyncio.wait_for(
+                    neural_tts.generate_speech_async(text, voice=voice_id, language="en"),
+                    timeout=TTS_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                print(f"⚠️ TTS timed out after {TTS_TIMEOUT_SECONDS}s")
+                await safe_send_json(ws, {
+                    "type": "error",
+                    "message": "Voice response took too long. Continuing with text only."
+                })
+                return
+
         print(f"✅ TTS generated: {len(audio_data)} bytes")
         
         # Audio processing in dedicated thread pool
