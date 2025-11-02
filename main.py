@@ -50,11 +50,6 @@ async def lifespan(app: FastAPI):
     
     print("🛑 Shutting down...", flush=True)
     scrape_executor.shutdown(wait=False)
-    try:
-        import chat_service
-        await chat_service.chat_service.close()
-    except:
-        pass
     print("✅ Cleanup complete", flush=True)
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)

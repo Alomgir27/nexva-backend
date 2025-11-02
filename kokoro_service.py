@@ -30,8 +30,9 @@ class KokoroService:
                 return
 
             try:
-                device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                print(f"🚀 Loading Kokoro-82M on {device.upper()}...")
+                # Force CPU for stability (no GPU VRAM issues)
+                device = 'cpu'
+                print(f"🚀 Loading Kokoro-82M on CPU (forced for stability)...")
                 
                 self.pipeline = KPipeline(lang_code='a', device=device)
                 self.device = device
@@ -44,7 +45,7 @@ class KokoroService:
                 except:
                     pass
                 
-                print(f"✅ Kokoro-82M ready on {device.upper()}")
+                print(f"✅ Kokoro-82M ready on CPU")
             except Exception as e:
                 print(f"❌ Kokoro initialization failed: {e}")
                 self.pipeline = None
