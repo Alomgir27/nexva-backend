@@ -51,9 +51,7 @@ export const Utils = {
     try {
       const key = `nexva_conv_${apiKey}`;
       localStorage.removeItem(key);
-    } catch (e) {
-      // Failed to clear
-    }
+    } catch (e) {}
   }
 };
 

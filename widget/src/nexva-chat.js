@@ -19,12 +19,10 @@ export const NexvaChat = {
   
   init: function(apiKey, options) {
     if (this.initialized && this.config && this.config.apiKey === apiKey) {
-      console.log('[Nexva] Already initialized with same API key');
       return;
     }
     
     if (this.initialized) {
-      console.log('[Nexva] Reinitializing with different config, cleaning up...');
       this.cleanup();
     }
     
@@ -46,7 +44,6 @@ export const NexvaChat = {
     
     if (!this.pageUnloadHandlerAttached) {
       window.addEventListener('beforeunload', () => {
-        console.log('[Nexva] Page unloading, closing WebSocket gracefully');
         if (this.voiceChatWs) {
           this.voiceChatWs.close();
         }
@@ -231,7 +228,6 @@ export const NexvaChat = {
           type: "init",
           conversation_id: this.conversationId
         }));
-        console.log('[Voice] Sent conversation ID:', this.conversationId);
       }
       
       WebSocketManager.onResponseComplete = () => {
@@ -372,7 +368,6 @@ export const NexvaChat = {
         Messaging.init(convId, this.config.apiUrl);
       }
       if (mode) {
-        console.log(`[Nexva] Conversation mode updated to: ${mode}`);
         this.currentMode = mode;
         UI.updateMode(mode);
         
@@ -386,7 +381,6 @@ export const NexvaChat = {
     }, existingConversationId);
     
     WebSocketManager.onSupportMessage = () => {
-      console.log('[Nexva] Support message received, isOpen:', this.isOpen);
       if (!this.isOpen) {
         this.showNotification();
       }

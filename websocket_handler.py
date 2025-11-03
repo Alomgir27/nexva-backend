@@ -28,19 +28,13 @@ class ConnectionManager:
             await self.active_connections[session_id].send_text(message)
     
     async def send_to_conversation(self, conversation_id: int, message: dict):
-        print(f"[WebSocket] Attempting to send to conversation {conversation_id}")
-        print(f"[WebSocket] Active connections: {list(self.conversation_connections.keys())}")
         if conversation_id in self.conversation_connections:
             try:
                 await self.conversation_connections[conversation_id].send_json(message)
-                print(f"[WebSocket] ✅ Message sent to conversation {conversation_id}")
                 return True
             except Exception as e:
-                print(f"[WebSocket] ❌ Failed to send: {e}")
                 del self.conversation_connections[conversation_id]
                 return False
-        else:
-            print(f"[WebSocket] ❌ Conversation {conversation_id} not in active connections")
         return False
     
     async def connect_support(self, websocket: WebSocket, ticket_id: int):
@@ -72,27 +66,19 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         return
     
     await websocket.accept()
-    print(f"[WebSocket] ✅ Connection accepted for chatbot {chatbot.id}")
+    ws_id = id(websocket)
     
     conversation_id = None
     session_id = None
     conversation = None
     
     try:
-        print(f"[WebSocket] Waiting for init message...")
         data = await websocket.receive_text()
         init_data = json.loads(data)
-        print(f"[WebSocket] Received init data: {init_data}")
         
         session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
         conversation_id = init_data.get('conversation_id')
-        
-        if conversation_id:
-            print(f"[WebSocket] Client requesting conversation {conversation_id}")
-        else:
-            print(f"[WebSocket] New conversation requested")
     except Exception as e:
-        print(f"[WebSocket] ❌ Error parsing init data: {e}")
         session_id = f"{api_key}_{datetime.utcnow().timestamp()}"
     
     history = []
@@ -109,18 +95,15 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                 if old_ws != websocket:
                     try:
                         await old_ws.close(code=1000, reason="Reconnected from another session")
-                        print(f"[WebSocket] 🔄 Closed old connection for conversation {conversation.id}")
                     except:
                         pass
             manager.conversation_connections[conversation.id] = websocket
-            print(f"[WebSocket] ✅ Conversation {conversation.id} reconnected, mode: {conversation.mode}, active: {list(manager.conversation_connections.keys())}")
             
             if conversation.ticket_id:
                 ticket = db.query(models.SupportTicket).filter(
                     models.SupportTicket.id == conversation.ticket_id
                 ).first()
                 if ticket and ticket.conversation_id != conversation.id:
-                    print(f"[WebSocket] Updating ticket {ticket.id} conversation_id from {ticket.conversation_id} to {conversation.id}")
                     ticket.conversation_id = conversation.id
                     db.commit()
             
@@ -141,11 +124,8 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                 } for msg in messages],
                 'mode': conversation.mode or 'ai'
             })
-            print(f"[WebSocket] Sent {len(messages)} history messages")
             
             history = [{'role': msg.role, 'content': msg.content} for msg in messages]
-        else:
-            print(f"[WebSocket] ⚠️ Conversation {conversation_id} not found, creating new")
     
     if not conversation:
         conversation = models.Conversation(
@@ -157,13 +137,11 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         db.refresh(conversation)
         
         manager.conversation_connections[conversation.id] = websocket
-        print(f"[WebSocket] ✅ New conversation {conversation.id} created, active: {list(manager.conversation_connections.keys())}")
         
         await websocket.send_json({
             'type': 'complete',
             'conversation_id': conversation.id
         })
-        print(f"[WebSocket] Sent conversation ID to client")
     
     try:
         while True:
@@ -190,7 +168,6 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             db.refresh(conversation)
             
             if conversation.mode == "human":
-                print(f"[Chat] User message in human mode, broadcasting to support...")
                 if conversation.ticket_id:
                     await manager.broadcast_to_ticket(conversation.ticket_id, {
                         'type': 'message',
@@ -202,7 +179,6 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                             'created_at': db_message.created_at.isoformat()
                         }
                     })
-                    print(f"[Chat] ✅ User message broadcasted to ticket {conversation.ticket_id}")
                 continue
             
             history.append({'role': 'user', 'content': user_message})
@@ -238,23 +214,15 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             db.commit()
     
     except WebSocketDisconnect:
-        print(f"[WebSocket] 🔌 Conversation {conversation.id if conversation else 'unknown'} disconnected normally")
         if conversation and conversation.id in manager.conversation_connections:
             if manager.conversation_connections[conversation.id] == websocket:
                 del manager.conversation_connections[conversation.id]
-                print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id}, remaining: {list(manager.conversation_connections.keys())}")
-            else:
-                print(f"[WebSocket] ⚠️ Skipping cleanup - different WebSocket is active for conversation {conversation.id}")
     except Exception as e:
-        print(f"[WebSocket] ❌ Error in conversation {conversation.id if conversation else 'unknown'}: {e}")
         import traceback
         traceback.print_exc()
         if conversation and conversation.id in manager.conversation_connections:
             if manager.conversation_connections[conversation.id] == websocket:
                 del manager.conversation_connections[conversation.id]
-                print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id} after error, remaining: {list(manager.conversation_connections.keys())}")
-            else:
-                print(f"[WebSocket] ⚠️ Skipping cleanup after error - different WebSocket is active for conversation {conversation.id}")
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
@@ -313,24 +281,15 @@ async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: m
                 'message': message_obj
             })
             
-            print(f"[Support] Ticket conversation_id: {ticket.conversation_id}")
-            print(f"[Support] Attempting to send message to customer...")
-            
-            sent = await manager.send_to_conversation(ticket.conversation_id, {
+            await manager.send_to_conversation(ticket.conversation_id, {
                 'type': 'human_message',
                 'content': content,
                 'sender_email': user.email,
                 'timestamp': db_message.created_at.isoformat()
             })
-            
-            if sent:
-                print(f"[Support] ✅ Message delivered to user in real-time")
-            else:
-                print(f"[Support] ⚠️ User not connected, message saved to DB only")
     
     except WebSocketDisconnect:
         manager.disconnect_support(websocket, ticket_id)
     except Exception as e:
-        print(f"Support WebSocket error: {e}")
         manager.disconnect_support(websocket, ticket_id)
 
