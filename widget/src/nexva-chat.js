@@ -372,8 +372,15 @@ export const NexvaChat = {
         Messaging.init(convId, this.config.apiUrl);
       }
       if (mode) {
+        console.log(`[Nexva] Conversation mode updated to: ${mode}`);
         this.currentMode = mode;
         UI.updateMode(mode);
+        
+        if (mode === 'human') {
+          this.supportRequested = true;
+        } else if (mode === 'ai') {
+          this.supportRequested = false;
+        }
       }
       this.updateActions();
     }, existingConversationId);

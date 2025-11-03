@@ -125,11 +125,13 @@ export const WebSocketManager = {
           this.onSupportMessage();
         }
       } else if (data.type === 'ticket_resolved') {
+        console.log('[WebSocket] Ticket resolved, switching to AI mode');
         Messaging.addMessage('system', '✅ ' + data.message);
         if (onConversationUpdate) {
           onConversationUpdate(this.conversationId, 'ai');
         }
       } else if (data.type === 'ticket_reopened') {
+        console.log('[WebSocket] Ticket reopened, switching to human mode');
         Messaging.addMessage('system', '🔄 ' + data.message);
         if (onConversationUpdate) {
           onConversationUpdate(this.conversationId, 'human');

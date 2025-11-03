@@ -1219,11 +1219,17 @@ async def resolve_ticket(
     
     db.commit()
     
+    print(f"[Ticket] Ticket {ticket_id} resolved, notifying customer...")
     import websocket_handler
-    await websocket_handler.manager.send_to_conversation(ticket.conversation_id, {
+    sent = await websocket_handler.manager.send_to_conversation(ticket.conversation_id, {
         'type': 'ticket_resolved',
         'message': 'Your issue has been resolved. Returning to AI assistant.'
     })
+    
+    if sent:
+        print(f"[Ticket] ✅ Customer notified about ticket resolution")
+    else:
+        print(f"[Ticket] ⚠️ Customer not connected, will see resolution when they reconnect")
     
     return {"message": "Ticket resolved"}
 
@@ -1257,11 +1263,17 @@ async def reopen_ticket(
     
     db.commit()
     
+    print(f"[Ticket] Ticket {ticket_id} reopened, notifying customer...")
     import websocket_handler
-    await websocket_handler.manager.send_to_conversation(ticket.conversation_id, {
+    sent = await websocket_handler.manager.send_to_conversation(ticket.conversation_id, {
         'type': 'ticket_reopened',
         'message': 'Your ticket has been reopened. A support agent will assist you.'
     })
+    
+    if sent:
+        print(f"[Ticket] ✅ Customer notified about ticket reopening")
+    else:
+        print(f"[Ticket] ⚠️ Customer not connected, will see reopening when they reconnect")
     
     return {"message": "Ticket reopened"}
 
