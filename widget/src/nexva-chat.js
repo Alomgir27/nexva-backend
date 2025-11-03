@@ -262,6 +262,9 @@ export const NexvaChat = {
       } else if (data.type === "response_end") {
         Messaging.finalizeMessage();
         VoiceChat.clearAssistantTranscript();
+        if (WebSocketManager.isAndroidDevice) {
+          WebSocketManager.playBufferedAndroidAudio();
+        }
         isSending = false;
       } else if (data.type === "error") {
         Messaging.addMessage('system', `❌ ${data.message}`);

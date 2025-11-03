@@ -19,6 +19,8 @@ export const WebSocketManager = {
   reconnectTimer: null,
   isManualClose: false,
   heartbeatInterval: null,
+  androidAudioBuffer: [],
+  isAndroidDevice: /android/i.test(navigator.userAgent),
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
@@ -170,14 +172,15 @@ export const WebSocketManager = {
   },
   
   queueAudio: function(audioBlob) {
+    if (this.isAndroidDevice) {
+      this.androidAudioBuffer.push(audioBlob);
+      return;
+    }
+    
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
-    const isAndroid = /android/i.test(navigator.userAgent);
     
     audio.preload = 'auto';
-    if (isAndroid) {
-      audio.volume = 1.0;
-    }
     audio.load();
     
     this.audioQueue.push({ audio, url: audioUrl });
@@ -185,6 +188,64 @@ export const WebSocketManager = {
     if (!this.isPlayingAudio) {
       this.playNextAudio();
     }
+  },
+  
+  playBufferedAndroidAudio: function() {
+    if (!this.isAndroidDevice || this.androidAudioBuffer.length === 0) {
+      if (this.onResponseComplete) {
+        this.onResponseComplete();
+      }
+      return;
+    }
+    
+    console.log(`[Android Audio] Merging ${this.androidAudioBuffer.length} chunks`);
+    const mergedBlob = new Blob(this.androidAudioBuffer, { type: 'audio/wav' });
+    this.androidAudioBuffer = [];
+    
+    const audioUrl = URL.createObjectURL(mergedBlob);
+    const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
+    audio.volume = 1.0;
+    
+    this.currentAudio = audio;
+    this.isPlayingAudio = true;
+    this.updatePlaybackStatus(true);
+    
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      this.isPlayingAudio = false;
+      this.currentAudio = null;
+      this.updatePlaybackStatus(false);
+      if (this.onResponseComplete) {
+        this.onResponseComplete();
+      }
+    };
+    
+    audio.onerror = () => {
+      console.error('[Android Audio] Playback error');
+      URL.revokeObjectURL(audioUrl);
+      this.isPlayingAudio = false;
+      this.currentAudio = null;
+      this.updatePlaybackStatus(false);
+      if (this.onResponseComplete) {
+        this.onResponseComplete();
+      }
+    };
+    
+    audio.load();
+    
+    setTimeout(() => {
+      audio.play().catch(err => {
+        console.error('[Android Audio] Play failed:', err);
+        URL.revokeObjectURL(audioUrl);
+        this.isPlayingAudio = false;
+        this.currentAudio = null;
+        this.updatePlaybackStatus(false);
+        if (this.onResponseComplete) {
+          this.onResponseComplete();
+        }
+      });
+    }, 200);
   },
   
   playNextAudio: function() {

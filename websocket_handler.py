@@ -149,7 +149,14 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
+            
+            if message_data.get('type') == 'ping':
+                continue
+            
             user_message = message_data.get('message', '')
+            
+            if not user_message or not user_message.strip():
+                continue
             
             db_message = models.Message(
                 conversation_id=conversation.id,
