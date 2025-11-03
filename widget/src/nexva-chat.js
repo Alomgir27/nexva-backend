@@ -17,12 +17,16 @@ export const NexvaChat = {
   notificationAudio: null,
   
   init: function(apiKey, options) {
-    // Prevent double initialization
     if (this.initialized && this.config && this.config.apiKey === apiKey) {
+      console.log('[Nexva] Already initialized with same API key');
       return;
     }
     
-    // Remove any existing widget
+    if (this.initialized) {
+      console.log('[Nexva] Reinitializing with different config, cleaning up...');
+      this.cleanup();
+    }
+    
     const existingContainer = document.querySelector('.nexva-chat-container');
     if (existingContainer) {
       existingContainer.remove();
@@ -211,6 +215,14 @@ export const NexvaChat = {
     };
     
     this.voiceChatWs.onopen = () => {
+      if (this.conversationId) {
+        this.voiceChatWs.send(JSON.stringify({
+          type: "init",
+          conversation_id: this.conversationId
+        }));
+        console.log('[Voice] Sent conversation ID:', this.conversationId);
+      }
+      
       WebSocketManager.onResponseComplete = () => {
         if (this.voiceChatActive && VoiceChat.continuousMode && !isSending) {
           setTimeout(async () => {
@@ -310,6 +322,22 @@ export const NexvaChat = {
       voiceStatus.textContent = 'Click microphone to start';
       voiceStatus.style.color = '';
     }
+  },
+  
+  cleanup: function() {
+    if (this.voiceChatWs && this.voiceChatWs.readyState === WebSocket.OPEN) {
+      this.voiceChatWs.close();
+      this.voiceChatWs = null;
+    }
+    
+    WebSocketManager.close();
+    VoiceChat.stop();
+    
+    this.isOpen = false;
+    this.initialized = false;
+    this.supportRequested = false;
+    this.voiceChatActive = false;
+    this.conversationId = null;
   },
   
   toggleChat: function() {

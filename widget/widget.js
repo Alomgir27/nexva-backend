@@ -3,6 +3,12 @@ import { NexvaChat } from './src/nexva-chat.js';
 window.NexvaChat = NexvaChat;
 
 (function() {
+  if (window.__NEXVA_INITIALIZED__) {
+    console.log('[Nexva] Widget already initialized, skipping...');
+    return;
+  }
+  window.__NEXVA_INITIALIZED__ = true;
+  
   const script = document.currentScript || document.querySelector('script[data-api-key]');
   if (script && script.hasAttribute('data-api-key')) {
     const config = {

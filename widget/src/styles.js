@@ -28,7 +28,21 @@ export const Styles = {
     const userMessageText = theme === 'dark' ? bgBase : '#ffffff';
     
     style.textContent = `
-      .nexva-chat-container { position: fixed; ${position.includes('bottom') ? 'bottom: 20px;' : 'top: 20px;'} ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} z-index: 999999; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+      .nexva-chat-container { 
+        position: fixed !important; 
+        ${position.includes('bottom') ? 'bottom: 20px !important;' : 'top: 20px !important;'} 
+        ${position.includes('right') ? 'right: 20px !important;' : 'left: 20px !important;'} 
+        z-index: 999999 !important; 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: none !important;
+        max-height: none !important;
+        transform: none !important;
+        pointer-events: auto !important;
+      }
       .nexva-chat-button { 
         width: ${bubbleSize}; 
         height: ${bubbleSize}; 
@@ -80,20 +94,24 @@ export const Styles = {
       }
       .nexva-chat-window { 
         display: none; 
-        position: fixed; 
-        ${position.includes('bottom') ? 'bottom: 90px;' : 'top: 90px;'} 
-        ${position.includes('right') ? 'right: 20px;' : 'left: 20px;'} 
-        width: min(400px, calc(100vw - 40px)); 
-        height: min(650px, calc(100vh - 120px)); 
-        max-height: calc(100vh - 120px); 
-        max-width: calc(100vw - 40px); 
+        position: fixed !important; 
+        ${position.includes('bottom') ? 'bottom: 90px !important;' : 'top: 90px !important;'} 
+        ${position.includes('right') ? 'right: 20px !important;' : 'left: 20px !important;'} 
+        width: min(400px, calc(100vw - 40px)) !important; 
+        height: min(650px, calc(100vh - 120px)) !important; 
+        max-height: calc(100vh - 120px) !important; 
+        max-width: calc(100vw - 40px) !important; 
         background: ${bgBase}; 
         border-radius: ${borderRadius}; 
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); 
         flex-direction: column; 
         overflow: hidden; 
         border: 0.5px solid ${borderColor}; 
-        z-index: 999999; 
+        z-index: 999999 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+        box-sizing: border-box !important;
       }
       .nexva-chat-window.open { display: flex; animation: slideUp 0.3s ease; }
       .nexva-chat-window.fullscreen { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; top: 0; bottom: 0; left: 0; right: 0; border: none; }
@@ -285,23 +303,23 @@ export const Styles = {
       @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
       @media (max-width: 480px) { 
         .nexva-chat-container { 
-          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
-          ${position.includes('bottom') ? 'bottom: 15px;' : 'top: 15px;'}
+          ${position.includes('right') ? 'right: 15px !important;' : 'left: 15px !important;'}
+          ${position.includes('bottom') ? 'bottom: 15px !important;' : 'top: 15px !important;'}
         }
         .nexva-chat-button {
           width: 56px;
           height: 56px;
         }
         .nexva-chat-window { 
-          width: calc(100vw - 30px); 
-          height: calc(100vh - 90px);
-          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
-          ${position.includes('bottom') ? 'bottom: 80px;' : 'top: 80px;'}
-          max-width: 100vw;
+          width: calc(100vw - 30px) !important; 
+          height: calc(100vh - 90px) !important;
+          ${position.includes('right') ? 'right: 15px !important;' : 'left: 15px !important;'}
+          ${position.includes('bottom') ? 'bottom: 80px !important;' : 'top: 80px !important;'}
+          max-width: calc(100vw - 30px) !important;
         } 
         .nexva-notification-bubble {
-          ${position.includes('right') ? 'right: 15px;' : 'left: 15px;'}
-          ${position.includes('bottom') ? 'bottom: 85px;' : 'top: 85px;'}
+          ${position.includes('right') ? 'right: 15px !important;' : 'left: 15px !important;'}
+          ${position.includes('bottom') ? 'bottom: 85px !important;' : 'top: 85px !important;'}
           max-width: calc(100vw - 90px);
         }
         .nexva-mode-switcher-container { display: none; }

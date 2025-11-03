@@ -110,6 +110,7 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
     db = models.SessionLocal()
     interrupt_flag = {"interrupted": False}
     current_task = None
+    conversation_id = None
     
     try:
         chatbot = db.query(models.Chatbot).filter(models.Chatbot.api_key == api_key).first()
@@ -135,6 +136,13 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
             if websocket.client_state != WebSocketState.CONNECTED:
                 break
             data = json.loads(message)
+            
+            if data.get("type") == "init":
+                conversation_id = data.get("conversation_id")
+                if conversation_id:
+                    print(f"🎙️ Voice chat connected to conversation {conversation_id}")
+                continue
+                
             if data.get("type") == "text_query":
                 query = data.get("text", "").strip()
                 if query:
@@ -148,7 +156,7 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
                     
                     interrupt_flag["interrupted"] = False
                     current_task = asyncio.create_task(
-                        process_query(websocket, query, chatbot, domain_ids, db, interrupt_flag)
+                        process_query(websocket, query, chatbot, domain_ids, db, interrupt_flag, conversation_id)
                     )
             elif data.get("type") == "interrupt":
                 print("🛑 Interrupt received from frontend")
@@ -170,12 +178,33 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
             except:
                 pass
 
-async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_ids: list, db, interrupt_flag: dict):
+async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_ids: list, db, interrupt_flag: dict, conversation_id: int = None):
     if websocket.client_state != WebSocketState.CONNECTED:
         return
     
     try:
         print(f"💬 Query: '{text_query}'")
+        
+        # Load conversation history if available
+        conversation_history = ""
+        if conversation_id:
+            conversation = db.query(models.Conversation).filter(models.Conversation.id == conversation_id).first()
+            if conversation:
+                messages = db.query(models.Message).filter(
+                    models.Message.conversation_id == conversation_id
+                ).order_by(models.Message.created_at.desc()).limit(10).all()
+                messages = list(reversed(messages))
+                
+                if messages:
+                    history_parts = []
+                    for msg in messages:
+                        if msg.sender_type == 'support':
+                            history_parts.append(f"Support: {msg.content}")
+                        else:
+                            role = "User" if msg.role == "user" else "Assistant"
+                            history_parts.append(f"{role}: {msg.content}")
+                    conversation_history = "\n".join(history_parts)
+                    print(f"📜 Loaded {len(messages)} previous messages")
         
         # Search with async embedding
         results = await search.search_chatbot_content(chatbot.id, text_query, max_results=5)
@@ -183,6 +212,10 @@ async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_i
         
         context = build_context(results or [], text_query)
         prompt = create_system_prompt(chatbot.name, context)
+        
+        # Add conversation history to prompt if available
+        if conversation_history:
+            prompt += f"\n\nPrevious conversation:\n{conversation_history}"
         
         await safe_send_json(websocket, {"type": "response_start"})
         

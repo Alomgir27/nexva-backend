@@ -211,7 +211,7 @@ export const WebSocketManager = {
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
     
-    audio.onended = () => {
+    const cleanupAndComplete = () => {
       URL.revokeObjectURL(audioUrl);
       this.isPlayingAudio = false;
       this.currentAudio = null;
@@ -221,31 +221,22 @@ export const WebSocketManager = {
       }
     };
     
-    audio.onerror = () => {
-      console.error('[Android Audio] Playback error');
-      URL.revokeObjectURL(audioUrl);
-      this.isPlayingAudio = false;
-      this.currentAudio = null;
-      this.updatePlaybackStatus(false);
-      if (this.onResponseComplete) {
-        this.onResponseComplete();
-      }
+    audio.onended = cleanupAndComplete;
+    
+    audio.onerror = (err) => {
+      console.error('[Android Audio] Playback error:', err);
+      cleanupAndComplete();
+    };
+    
+    audio.oncanplaythrough = () => {
+      console.log('[Android Audio] Fully loaded, starting playback');
+      audio.play().catch(err => {
+        console.error('[Android Audio] Play failed:', err);
+        cleanupAndComplete();
+      });
     };
     
     audio.load();
-    
-    setTimeout(() => {
-      audio.play().catch(err => {
-        console.error('[Android Audio] Play failed:', err);
-        URL.revokeObjectURL(audioUrl);
-        this.isPlayingAudio = false;
-        this.currentAudio = null;
-        this.updatePlaybackStatus(false);
-        if (this.onResponseComplete) {
-          this.onResponseComplete();
-        }
-      });
-    }, 200);
   },
   
   playNextAudio: function() {

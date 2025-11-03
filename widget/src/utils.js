@@ -31,7 +31,7 @@ export const Utils = {
         return;
       }
       const key = `nexva_conv_${apiKey}`;
-      sessionStorage.setItem(key, conversationId.toString());
+      localStorage.setItem(key, conversationId.toString());
     } catch (e) {
       // Failed to save
     }
@@ -40,7 +40,7 @@ export const Utils = {
   getConversationId: function(apiKey) {
     try {
       const key = `nexva_conv_${apiKey}`;
-      const value = sessionStorage.getItem(key);
+      const value = localStorage.getItem(key);
       return value ? parseInt(value, 10) : null;
     } catch (e) {
       return null;
@@ -50,7 +50,7 @@ export const Utils = {
   clearConversation: function(apiKey) {
     try {
       const key = `nexva_conv_${apiKey}`;
-      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
     } catch (e) {
       // Failed to clear
     }
