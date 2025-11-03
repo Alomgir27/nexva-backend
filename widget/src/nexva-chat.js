@@ -410,28 +410,44 @@ export const NexvaChat = {
     
     Messaging.addMessage('system', switchMessage);
     
-    fetch(`${this.config.apiUrl}/api/conversations/${this.conversationId}/switch-mode`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode })
-    })
-    .then(res => res.json())
-    .then(data => {
-      this.currentMode = mode;
-      UI.updateMode(mode);
-      const successMsg = mode === 'human'
-        ? '👤 Connected to human support team'
-        : '🤖 Now chatting with AI assistant';
-      Messaging.addMessage('system', successMsg);
-      this.updateActions();
+    const performSwitch = () => {
+      fetch(`${this.config.apiUrl}/api/conversations/${this.conversationId}/switch-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      })
+      .then(res => res.json())
+      .then(data => {
+        this.currentMode = mode;
+        UI.updateMode(mode);
+        const successMsg = mode === 'human'
+          ? '👤 Connected to human support team'
+          : '🤖 Now chatting with AI assistant';
+        Messaging.addMessage('system', successMsg);
+        this.updateActions();
+      })
+      .catch((error) => {
+        Messaging.addMessage('system', '❌ Failed to switch mode. Please try again.');
+      });
+    };
+    
+    if (mode === 'human') {
+      const reconnectPromise = WebSocketManager.reconnect();
       
-      if (mode === 'human') {
-        WebSocketManager.reconnect();
+      if (reconnectPromise && typeof reconnectPromise.then === 'function') {
+        reconnectPromise
+          .then(() => {
+            performSwitch();
+          })
+          .catch(() => {
+            Messaging.addMessage('system', '❌ Connection failed. Please try again.');
+          });
+      } else {
+        setTimeout(performSwitch, 800);
       }
-    })
-    .catch((error) => {
-      Messaging.addMessage('system', '❌ Failed to switch mode. Please try again.');
-    });
+    } else {
+      performSwitch();
+    }
   },
   
   closeChat: function() {

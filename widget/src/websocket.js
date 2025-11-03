@@ -175,15 +175,34 @@ export const WebSocketManager = {
   },
   
   reconnect: function() {
-    this.isManualClose = true;
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.isManualClose = false;
-    if (this.config && this.onConversationUpdate) {
-      this.connect(this.config, this.onConversationUpdate, this.conversationId);
-    }
+    return new Promise((resolve, reject) => {
+      this.isManualClose = true;
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
+      this.isManualClose = false;
+      
+      if (this.config && this.onConversationUpdate) {
+        this.connect(this.config, this.onConversationUpdate, this.conversationId);
+        
+        const checkConnection = setInterval(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            clearInterval(checkConnection);
+            resolve();
+          }
+        }, 100);
+        
+        setTimeout(() => {
+          clearInterval(checkConnection);
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('Reconnection timeout'));
+          }
+        }, 3000);
+      } else {
+        reject(new Error('No config available'));
+      }
+    });
   },
   
   queueAudio: function(audioBlob) {

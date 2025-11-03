@@ -26,15 +26,6 @@ async def safe_send_json(ws: WebSocket, data: dict) -> bool:
     except:
         return False
 
-def is_code_related(query: str, results: list) -> bool:
-    if any(kw in query.lower() for kw in CODE_KEYWORDS):
-        return True
-    for result in (results or [])[:2]:
-        content = result.get('content', '')[:1000]
-        if sum(1 for ind in CODE_INDICATORS if ind in content) >= 3:
-            return True
-    return False
-
 def clean_text_for_tts(text: str) -> str:
     replacements = [
         (r'```[\s\S]*?```', ' Here is a code example. '),
@@ -82,25 +73,40 @@ async def generate_and_send_audio(ws: WebSocket, text: str, voice_id: str):
 def build_context(results: list, query: str) -> str:
     if not results:
         return ""
-    limit = None if is_code_related(query, results) else 1000
+    
     parts = []
-    for i, result in enumerate(results[:2]):
+    for i, result in enumerate(results[:3]):
         content = result.get('content', '')
-        if limit:
-            content = content[:limit]
-        parts.append(f"Source {i+1}:\n{content}")
-    return "\n\n".join(parts)
+        title = result.get('title', 'Untitled')
+        url = result.get('url', '')
+        
+        parts.append(f"[{title}]\nSource: {url}\n{content}")
+    
+    return "\n\n---\n\n".join(parts)
 
 def create_system_prompt(chatbot_name: str, context: str) -> str:
-    return f"""You are a helpful AI assistant for {chatbot_name}. 
-Your primary purpose is to answer questions specifically about {chatbot_name} and its related services.
-Answer user questions based ONLY on the provided context from the knowledge base.
-If the context doesn't contain relevant information, politely say you don't have that information in your knowledge base.
-If asked about unrelated topics, politely redirect the conversation back to {chatbot_name}.
-Keep responses concise and natural for voice conversation (2-3 sentences max).
+    if context:
+        return f"""You are a helpful AI assistant for {chatbot_name}. 
+Answer questions naturally and directly using the context provided below.
 
-Context from knowledge base:
-{context if context else "No relevant context found in the knowledge base."}"""
+Guidelines:
+- Focus on answering questions about {chatbot_name} and its services
+- Provide clear, complete answers with all relevant details
+- When relevant information includes URLs or links, mention them
+- Keep language conversational and natural for voice
+- Never mention "context" or "according to" - just answer confidently
+- If asked about unrelated topics, politely redirect to {chatbot_name}
+
+Context:
+{context}"""
+    else:
+        return f"""You are a helpful AI assistant for {chatbot_name}.
+
+Guidelines:
+- Focus on answering questions about {chatbot_name} and its services
+- If you don't have specific information, be honest and suggest where to find it
+- Be conversational and helpful
+- Keep responses clear and natural for voice conversation"""
 
 async def handle_tts_chunk(ws: WebSocket, buffer: str, voice_id: str):
     await generate_and_send_audio(ws, buffer, voice_id)

@@ -179,6 +179,16 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                             'created_at': db_message.created_at.isoformat()
                         }
                     })
+                    
+                    await websocket.send_json({
+                        'type': 'human_mode_ack',
+                        'message': 'Message sent to support team'
+                    })
+                else:
+                    await websocket.send_json({
+                        'type': 'human_mode_ack',
+                        'message': 'Waiting for support team...'
+                    })
                 continue
             
             history.append({'role': 'user', 'content': user_message})
