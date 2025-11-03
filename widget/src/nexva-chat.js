@@ -390,7 +390,6 @@ export const NexvaChat = {
   },
   
   switchMode: function(mode) {
-    // Check if human support is enabled
     if (!this.config.enableHumanSupport) {
       return;
     }
@@ -398,8 +397,7 @@ export const NexvaChat = {
     if (mode === this.currentMode) {
       return;
     }
-    
-    // If no conversation yet, just update the UI
+
     if (!this.conversationId) {
       this.currentMode = mode;
       UI.updateMode(mode);
@@ -426,6 +424,10 @@ export const NexvaChat = {
         : '🤖 Now chatting with AI assistant';
       Messaging.addMessage('system', successMsg);
       this.updateActions();
+      
+      if (mode === 'human') {
+        WebSocketManager.reconnect();
+      }
     })
     .catch((error) => {
       Messaging.addMessage('system', '❌ Failed to switch mode. Please try again.');

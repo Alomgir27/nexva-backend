@@ -24,12 +24,10 @@ export const WebSocketManager = {
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('[WebSocket] Already connected');
       return;
     }
     
     if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
-      console.log('[WebSocket] Connection in progress');
       return;
     }
     
@@ -47,11 +45,9 @@ export const WebSocketManager = {
     const host = config.apiUrl.replace(/^https?:\/\//, '');
     const wsUrl = `${protocol}//${host}/ws/chat/${config.apiKey}`;
     
-    console.log(`[WebSocket] Connecting to ${wsUrl}...`);
     this.ws = new WebSocket(wsUrl);
     
     this.ws.onopen = () => {
-      console.log('[WebSocket] ✅ Connection established');
       this.reconnectAttempts = 0;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -63,16 +59,10 @@ export const WebSocketManager = {
       };
       if (this.conversationId) {
         initMessage.conversation_id = this.conversationId;
-        console.log(`[WebSocket] Sending init with conversation ID: ${this.conversationId}`);
-      } else {
-        console.log('[WebSocket] Sending init for new conversation');
       }
       
-      try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify(initMessage));
-        console.log('[WebSocket] ✅ Init message sent');
-      } catch (error) {
-        console.error('[WebSocket] ❌ Failed to send init message:', error);
       }
       
       if (this.heartbeatInterval) {
@@ -80,11 +70,7 @@ export const WebSocketManager = {
       }
       this.heartbeatInterval = setInterval(() => {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          try {
-            this.ws.send(JSON.stringify({ type: 'ping' }));
-          } catch (error) {
-            console.error('[WebSocket] Heartbeat failed:', error);
-          }
+          this.ws.send(JSON.stringify({ type: 'ping' }));
         }
       }, 30000);
     };
@@ -138,18 +124,9 @@ export const WebSocketManager = {
     };
     
     this.ws.onerror = (error) => {
-      console.error('[WebSocket] ❌ Connection error:', error);
-      console.error('[WebSocket] ReadyState:', this.ws ? this.ws.readyState : 'null');
     };
     
     this.ws.onclose = (event) => {
-      console.log(`[WebSocket] 🔌 Connection closed`);
-      console.log(`  ├─ Code: ${event.code}`);
-      console.log(`  ├─ Reason: ${event.reason || 'No reason provided'}`);
-      console.log(`  ├─ Clean: ${event.wasClean}`);
-      console.log(`  ├─ Manual: ${this.isManualClose}`);
-      console.log(`  └─ ConversationId: ${this.conversationId || 'none'}`);
-      
       this.ws = null;
       
       if (this.heartbeatInterval) {
@@ -160,20 +137,12 @@ export const WebSocketManager = {
       if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
         const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000);
-        console.log(`[WebSocket] 🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
         
         this.reconnectTimer = setTimeout(() => {
           if (this.config && this.apiKey) {
-            console.log('[WebSocket] Attempting reconnection...');
             this.connect(this.config, this.onConversationUpdate, this.conversationId);
-          } else {
-            console.error('[WebSocket] Cannot reconnect - missing config or apiKey');
           }
         }, delay);
-      } else if (this.isManualClose) {
-        console.log('[WebSocket] ⛔ Manual close - not reconnecting');
-      } else {
-        console.log('[WebSocket] ⛔ Max reconnect attempts reached');
       }
     };
   },
@@ -205,6 +174,18 @@ export const WebSocketManager = {
     }
   },
   
+  reconnect: function() {
+    this.isManualClose = true;
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.isManualClose = false;
+    if (this.config && this.onConversationUpdate) {
+      this.connect(this.config, this.onConversationUpdate, this.conversationId);
+    }
+  },
+  
   queueAudio: function(audioBlob) {
     if (this.isAndroidDevice) {
       this.androidAudioBuffer.push(audioBlob);
@@ -232,7 +213,6 @@ export const WebSocketManager = {
       return;
     }
     
-    console.log(`[Android Audio] Merging ${this.androidAudioBuffer.length} chunks`);
     const mergedBlob = new Blob(this.androidAudioBuffer, { type: 'audio/wav' });
     this.androidAudioBuffer = [];
     
@@ -258,14 +238,11 @@ export const WebSocketManager = {
     audio.onended = cleanupAndComplete;
     
     audio.onerror = (err) => {
-      console.error('[Android Audio] Playback error:', err);
       cleanupAndComplete();
     };
     
     audio.oncanplaythrough = () => {
-      console.log('[Android Audio] Fully loaded, starting playback');
       audio.play().catch(err => {
-        console.error('[Android Audio] Play failed:', err);
         cleanupAndComplete();
       });
     };
@@ -308,16 +285,10 @@ export const WebSocketManager = {
       const waitTime = isAndroid ? 500 : 300;
       
       if (audio.readyState >= minReadyState) {
-        audio.play().catch(err => {
-          console.warn('Audio playback error:', err);
-          cleanupAndNext();
-        });
+        audio.play().catch(cleanupAndNext);
       } else {
         audio.addEventListener('canplaythrough', () => {
-          audio.play().catch(err => {
-            console.warn('Audio playback error:', err);
-            cleanupAndNext();
-          });
+          audio.play().catch(cleanupAndNext);
         }, { once: true });
         
         setTimeout(() => {
