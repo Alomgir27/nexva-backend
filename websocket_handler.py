@@ -104,6 +104,14 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
         ).first()
         
         if conversation:
+            if conversation.id in manager.conversation_connections:
+                old_ws = manager.conversation_connections[conversation.id]
+                if old_ws != websocket:
+                    try:
+                        await old_ws.close(code=1000, reason="Reconnected from another session")
+                        print(f"[WebSocket] 🔄 Closed old connection for conversation {conversation.id}")
+                    except:
+                        pass
             manager.conversation_connections[conversation.id] = websocket
             print(f"[WebSocket] ✅ Conversation {conversation.id} reconnected, mode: {conversation.mode}, active: {list(manager.conversation_connections.keys())}")
             
@@ -232,15 +240,21 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
     except WebSocketDisconnect:
         print(f"[WebSocket] 🔌 Conversation {conversation.id if conversation else 'unknown'} disconnected normally")
         if conversation and conversation.id in manager.conversation_connections:
-            del manager.conversation_connections[conversation.id]
-            print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id}, remaining: {list(manager.conversation_connections.keys())}")
+            if manager.conversation_connections[conversation.id] == websocket:
+                del manager.conversation_connections[conversation.id]
+                print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id}, remaining: {list(manager.conversation_connections.keys())}")
+            else:
+                print(f"[WebSocket] ⚠️ Skipping cleanup - different WebSocket is active for conversation {conversation.id}")
     except Exception as e:
         print(f"[WebSocket] ❌ Error in conversation {conversation.id if conversation else 'unknown'}: {e}")
         import traceback
         traceback.print_exc()
         if conversation and conversation.id in manager.conversation_connections:
-            del manager.conversation_connections[conversation.id]
-            print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id} after error, remaining: {list(manager.conversation_connections.keys())}")
+            if manager.conversation_connections[conversation.id] == websocket:
+                del manager.conversation_connections[conversation.id]
+                print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id} after error, remaining: {list(manager.conversation_connections.keys())}")
+            else:
+                print(f"[WebSocket] ⚠️ Skipping cleanup after error - different WebSocket is active for conversation {conversation.id}")
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
