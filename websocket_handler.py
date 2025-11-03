@@ -231,14 +231,16 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
     
     except WebSocketDisconnect:
         print(f"[WebSocket] 🔌 Conversation {conversation.id if conversation else 'unknown'} disconnected normally")
+        if conversation and conversation.id in manager.conversation_connections:
+            del manager.conversation_connections[conversation.id]
+            print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id}, remaining: {list(manager.conversation_connections.keys())}")
     except Exception as e:
         print(f"[WebSocket] ❌ Error in conversation {conversation.id if conversation else 'unknown'}: {e}")
         import traceback
         traceback.print_exc()
-    finally:
         if conversation and conversation.id in manager.conversation_connections:
             del manager.conversation_connections[conversation.id]
-            print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id}, remaining: {list(manager.conversation_connections.keys())}")
+            print(f"[WebSocket] 🧹 Cleaned up conversation {conversation.id} after error, remaining: {list(manager.conversation_connections.keys())}")
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, user: models.User, db: Session):
     ticket = db.query(models.SupportTicket).filter(models.SupportTicket.id == ticket_id).first()
