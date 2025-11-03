@@ -23,7 +23,15 @@ export const WebSocketManager = {
   isAndroidDevice: /android/i.test(navigator.userAgent),
   
   connect: function(config, onConversationUpdate, existingConversationId = null) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('[WebSocket] Already connected');
+      return;
+    }
+    
+    if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+      console.log('[WebSocket] Connection in progress');
+      return;
+    }
     
     this.config = config;
     this.onConversationUpdate = onConversationUpdate;
@@ -37,10 +45,13 @@ export const WebSocketManager = {
     
     const protocol = config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = config.apiUrl.replace(/^https?:\/\//, '');
-    this.ws = new WebSocket(`${protocol}//${host}/ws/chat/${config.apiKey}`);
+    const wsUrl = `${protocol}//${host}/ws/chat/${config.apiKey}`;
+    
+    console.log(`[WebSocket] Connecting to ${wsUrl}...`);
+    this.ws = new WebSocket(wsUrl);
     
     this.ws.onopen = () => {
-      console.log('[WebSocket] ✅ Connected successfully');
+      console.log('[WebSocket] ✅ Connection established');
       this.reconnectAttempts = 0;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
@@ -52,15 +63,28 @@ export const WebSocketManager = {
       };
       if (this.conversationId) {
         initMessage.conversation_id = this.conversationId;
+        console.log(`[WebSocket] Sending init with conversation ID: ${this.conversationId}`);
+      } else {
+        console.log('[WebSocket] Sending init for new conversation');
       }
-      this.ws.send(JSON.stringify(initMessage));
+      
+      try {
+        this.ws.send(JSON.stringify(initMessage));
+        console.log('[WebSocket] ✅ Init message sent');
+      } catch (error) {
+        console.error('[WebSocket] ❌ Failed to send init message:', error);
+      }
       
       if (this.heartbeatInterval) {
         clearInterval(this.heartbeatInterval);
       }
       this.heartbeatInterval = setInterval(() => {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.send(JSON.stringify({ type: 'ping' }));
+          try {
+            this.ws.send(JSON.stringify({ type: 'ping' }));
+          } catch (error) {
+            console.error('[WebSocket] Heartbeat failed:', error);
+          }
         }
       }, 30000);
     };
@@ -114,11 +138,18 @@ export const WebSocketManager = {
     };
     
     this.ws.onerror = (error) => {
-      console.error('[WebSocket] Error:', error);
+      console.error('[WebSocket] ❌ Connection error:', error);
+      console.error('[WebSocket] ReadyState:', this.ws ? this.ws.readyState : 'null');
     };
     
     this.ws.onclose = (event) => {
-      console.log(`[WebSocket] Connection closed - Code: ${event.code}, Reason: ${event.reason}, Clean: ${event.wasClean}`);
+      console.log(`[WebSocket] 🔌 Connection closed`);
+      console.log(`  ├─ Code: ${event.code}`);
+      console.log(`  ├─ Reason: ${event.reason || 'No reason provided'}`);
+      console.log(`  ├─ Clean: ${event.wasClean}`);
+      console.log(`  ├─ Manual: ${this.isManualClose}`);
+      console.log(`  └─ ConversationId: ${this.conversationId || 'none'}`);
+      
       this.ws = null;
       
       if (this.heartbeatInterval) {
@@ -128,18 +159,21 @@ export const WebSocketManager = {
       
       if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
-        const delay = this.reconnectDelay * this.reconnectAttempts;
-        console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000);
+        console.log(`[WebSocket] 🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
         
         this.reconnectTimer = setTimeout(() => {
           if (this.config && this.apiKey) {
+            console.log('[WebSocket] Attempting reconnection...');
             this.connect(this.config, this.onConversationUpdate, this.conversationId);
+          } else {
+            console.error('[WebSocket] Cannot reconnect - missing config or apiKey');
           }
         }, delay);
       } else if (this.isManualClose) {
-        console.log('[WebSocket] Manual close - not reconnecting');
+        console.log('[WebSocket] ⛔ Manual close - not reconnecting');
       } else {
-        console.log('[WebSocket] Max reconnect attempts reached');
+        console.log('[WebSocket] ⛔ Max reconnect attempts reached');
       }
     };
   },

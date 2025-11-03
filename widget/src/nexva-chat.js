@@ -15,6 +15,7 @@ export const NexvaChat = {
   currentMode: 'ai',
   hasReceivedSupportResponse: false,
   notificationAudio: null,
+  pageUnloadHandlerAttached: false,
   
   init: function(apiKey, options) {
     if (this.initialized && this.config && this.config.apiKey === apiKey) {
@@ -37,12 +38,22 @@ export const NexvaChat = {
     UI.createWidget(this.config);
     this.attachEventListeners();
     
-    // Initialize notification audio
     const audioPath = `${this.config.apiUrl}/notifications.wav`;
     this.notificationAudio = new Audio(audioPath);
     this.notificationAudio.volume = 1.0;
     
     this.initialized = true;
+    
+    if (!this.pageUnloadHandlerAttached) {
+      window.addEventListener('beforeunload', () => {
+        console.log('[Nexva] Page unloading, closing WebSocket gracefully');
+        if (this.voiceChatWs) {
+          this.voiceChatWs.close();
+        }
+        WebSocketManager.close();
+      });
+      this.pageUnloadHandlerAttached = true;
+    }
     
     if (this.config.autoOpen) {
       setTimeout(() => this.openChat(), 1000);
