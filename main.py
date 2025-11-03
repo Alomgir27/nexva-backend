@@ -1403,8 +1403,24 @@ async def serve_widget():
             "Pragma": "no-cache",
             "Expires": "0",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "X-Content-Type-Options": "nosniff"
+        }
+    )
+
+@app.options("/widget.js")
+async def options_widget():
+    """Handle OPTIONS preflight for widget.js"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600"
         }
     )
 
@@ -1461,8 +1477,24 @@ async def serve_widget_src(filename: str):
             "Pragma": "no-cache",
             "Expires": "0",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "X-Content-Type-Options": "nosniff"
+        }
+    )
+
+@app.options("/src/{filename:path}")
+async def options_widget_src(filename: str):
+    """Handle OPTIONS preflight for widget source modules"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600"
         }
     )
 
