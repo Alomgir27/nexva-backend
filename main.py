@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks, UploadFile, File, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, EmailStr, ConfigDict
@@ -55,12 +56,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Nexva - AI Chatbot API", lifespan=lifespan)
 
+# Custom CORS middleware to ensure headers on all responses
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Add CORS headers to all responses
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "*"
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+        
+        return response
+
+app.add_middleware(CustomCORSMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Auth Models
