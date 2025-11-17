@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexva Chat Widget Demo</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #0a0b0d;
+      color: #f5f9fe;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .demo-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: #32f08c;
+    }
+    p {
+      font-size: 16px;
+      color: #a6aab5;
+      margin-bottom: 40px;
+    }
+    .demo-content {
+      background: #121314;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 32px;
+    }
+    .demo-content h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      color: #f5f9fe;
+    }
+    .demo-content ul {
+      list-style: none;
+      padding: 0;
+    }
+    .demo-content li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .demo-content li:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1>Nexva Chat Widget</h1>
+    <p>Click the chat button in the bottom-right corner to get started.</p>
+    
+    <div class="demo-content">
+      <h2>Features</h2>
+      <ul>
+        <li>✅ Modern green theme matching your app</li>
+        <li>✅ Custom logo support</li>
+        <li>✅ Fullscreen mode</li>
+        <li>✅ Voice chat with real-time transcription</li>
+        <li>✅ Proper message storage</li>
+        <li>✅ WebSocket streaming responses</li>
+        <li>✅ Human support request</li>
+        <li>✅ Clean modular architecture</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module" src="./widget.js"></script>
+  <script type="module">
+    // Initialize the widget
+    // Note: Replace 'test-key-123' with a valid API key from your dashboard
+    NexvaChat.init('7qjoBizhjGt28MFRoT4ME8a8zVr_EIHXvNyyTCmWtFk', {
+      apiUrl: 'http://localhost:8000',
+      logoUrl: './images/img.png',
+      primaryColor: '#32f08c',
+      welcomeMessage: 'Hi! How can I help you today?',
+      placeholder: 'Type your message...',
+      enableVoice: true,
+      enableHumanSupport: true,
+      theme: 'dark',
+      autoOpen: false
+    });
+  </script>
+</body>
+</html>
+
