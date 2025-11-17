@@ -399,6 +399,34 @@ export const NexvaChat = {
         : '❌ Failed to request support. Please try again.';
       Messaging.addMessage('system', errorMsg);
     });
+  },
+  
+  destroy: function() {
+    console.log('[Nexva] Destroying widget...');
+    
+    // Close any open connections
+    if (this.voiceActive) {
+      this.stopVoiceChat();
+    }
+    
+    // Close the chat window
+    this.closeChat();
+    
+    // Remove the widget container from DOM
+    const container = document.querySelector('.nexva-chat-container');
+    if (container) {
+      container.remove();
+    }
+    
+    // Reset state
+    this.isOpen = false;
+    this.supportRequested = false;
+    this.initialized = false;
+    this.conversationId = null;
+    this.currentMode = 'ai';
+    this.config = null;
+    
+    console.log('[Nexva] Widget destroyed');
   }
 };
 
