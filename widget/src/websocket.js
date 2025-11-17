@@ -101,6 +101,7 @@ export const WebSocketManager = {
   queueAudio: function(audioBlob) {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    audio.setAttribute('sinkId', 'default');
     
     this.audioQueue.push({ audio, url: audioUrl });
     
@@ -120,7 +121,7 @@ export const WebSocketManager = {
 
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
-    
+    VoiceChat.pauseRecognition();
     VoiceChat.interruptSent = false;
     
     const audioData = this.audioQueue.shift();
@@ -172,6 +173,7 @@ export const WebSocketManager = {
     this.audioQueue = [];
     this.isPlayingAudio = false;
     this.updatePlaybackStatus(false);
+    VoiceChat.resumeRecognition();
   }
 };
 

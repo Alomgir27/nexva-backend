@@ -14,6 +14,30 @@ export const VoiceChat = {
   onInterrupt: null,
   interruptSent: false,
   isPaused: false,
+  mediaStream: null,
+  
+  async requestMicrophoneAccess() {
+    try {
+      if (this.mediaStream) {
+        return true;
+      }
+      
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      
+      console.log('[VoiceChat] Microphone access granted with echo cancellation');
+      return true;
+    } catch (error) {
+      console.error('[VoiceChat] Microphone access denied:', error);
+      Messaging.addMessage('system', '❌ Microphone access denied. Please allow microphone access.');
+      return false;
+    }
+  },
   
   pauseRecognition: function() {
     if (this.recognition && this.isRecording && !this.isPaused) {
@@ -37,7 +61,7 @@ export const VoiceChat = {
             console.log('[VoiceChat] Error resuming recognition:', e);
           }
         }
-      }, 300);
+      }, 500);
     }
   },
   
@@ -45,7 +69,7 @@ export const VoiceChat = {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
   },
   
-  start: function(onTranscript, continuous = false) {
+  start: async function(onTranscript, continuous = false) {
     if (!this.isSupported()) {
       Messaging.addMessage('system', '❌ Voice input is not supported in your browser. Please use Chrome or Edge.');
       return false;
@@ -55,6 +79,11 @@ export const VoiceChat = {
       return true;
     }
     
+    const hasAccess = await this.requestMicrophoneAccess();
+    if (!hasAccess) {
+      return false;
+    }
+    
     this.continuousMode = continuous;
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -62,6 +91,7 @@ export const VoiceChat = {
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
+    this.recognition.maxAlternatives = 1;
     
     this.finalTranscript = '';
     this.currentMessageIndex = -1;
@@ -84,6 +114,11 @@ export const VoiceChat = {
     };
     
     this.recognition.onresult = (event) => {
+      if (this.isPaused) {
+        console.log('[VoiceChat] Ignoring result - paused');
+        return;
+      }
+      
       let interimTranscript = '';
       
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -267,6 +302,11 @@ export const VoiceChat = {
         this.recognition.stop();
       } catch (e) {}
       this.recognition = null;
+    }
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream = null;
+      console.log('[VoiceChat] Microphone stream stopped');
     }
     if (this.silenceTimer) {
       clearTimeout(this.silenceTimer);
