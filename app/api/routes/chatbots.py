@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 from app import database, schemas
 from app.services import auth, search
@@ -44,6 +45,33 @@ def delete_chatbot(
     db.delete(chatbot)
     db.commit()
     return {"message": "Chatbot deleted successfully"}
+
+@router.get("/{chatbot_id}/stats")
+def get_chatbot_stats(
+    chatbot_id: int,
+    current_user: database.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    chatbot = db.query(database.Chatbot).filter(
+        database.Chatbot.id == chatbot_id,
+        database.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    total_conversations = db.query(database.Conversation).filter(
+        database.Conversation.chatbot_id == chatbot_id
+    ).count()
+    
+    unique_customers = db.query(func.count(func.distinct(database.Conversation.session_id))).filter(
+        database.Conversation.chatbot_id == chatbot_id,
+        database.Conversation.session_id.isnot(None)
+    ).scalar() or 0
+    
+    return {
+        "total_conversations": total_conversations,
+        "unique_customers": unique_customers
+    }
 
 @router.put("/{chatbot_id}/voice")
 def update_chatbot_voice(
