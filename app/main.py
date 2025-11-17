@@ -55,8 +55,21 @@ async def serve_widget():
             "Pragma": "no-cache",
             "Expires": "0",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
             "X-Content-Type-Options": "nosniff"
+        }
+    )
+
+@app.options("/widget.js")
+async def serve_widget_options():
+    from fastapi import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
         }
     )
 
@@ -80,8 +93,21 @@ async def serve_widget_src(filename: str):
             "Pragma": "no-cache",
             "Expires": "0",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
             "X-Content-Type-Options": "nosniff"
+        }
+    )
+
+@app.options("/src/{filename:path}")
+async def serve_widget_src_options(filename: str):
+    from fastapi import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
         }
     )
 
