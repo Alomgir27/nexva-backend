@@ -67,69 +67,77 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
     chatbot = db.query(database.Chatbot).filter(database.Chatbot.api_key == api_key).first()
     
     if not chatbot:
+        print(f"[WebSocket] ❌ Invalid API key: {api_key}")
         await websocket.close(code=4001, reason="Invalid API key")
         return
     
-    await websocket.accept()
-    
-    data = await websocket.receive_text()
-    init_data = json.loads(data)
-    
-    session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
-    conversation_id = init_data.get('conversation_id')
-    
-    conversation = None
-    history = []
-    
-    if conversation_id:
-        conversation = db.query(database.Conversation).filter(
-            database.Conversation.id == conversation_id,
-            database.Conversation.chatbot_id == chatbot.id
-        ).first()
-        
-        if conversation:
-            messages = db.query(database.Message).filter(
-                database.Message.conversation_id == conversation_id
-            ).order_by(database.Message.created_at.desc()).limit(10).all()
-            messages.reverse()
-            
-            await websocket.send_json({
-                'type': 'history',
-                'messages': [{
-                    'id': msg.id,
-                    'role': msg.role,
-                    'content': msg.content,
-                    'sender_type': msg.sender_type or 'ai',
-                    'sender_email': msg.sender_email,
-                    'created_at': msg.created_at.isoformat()
-                } for msg in messages],
-                'mode': conversation.mode or 'ai'
-            })
-            
-            history = [{'role': msg.role, 'content': msg.content} for msg in messages]
-    
-    if not conversation:
-        conversation = database.Conversation(
-            chatbot_id=chatbot.id,
-            session_id=session_id
-        )
-        db.add(conversation)
-        db.commit()
-        db.refresh(conversation)
-        
-        await websocket.send_json({
-            'type': 'complete',
-            'conversation_id': conversation.id
-        })
-    
-    manager.conversation_connections[conversation.id] = websocket
-    print(f"[WebSocket] Conversation {conversation.id} connected, mode: {conversation.mode}")
+    print(f"[WebSocket] ✅ Valid API key for chatbot: {chatbot.name} (ID: {chatbot.id})")
     
     try:
+        await websocket.accept()
+        print(f"[WebSocket] Connection accepted, waiting for initial message...")
+        
+        data = await websocket.receive_text()
+        init_data = json.loads(data)
+        print(f"[WebSocket] Received init data: {init_data}")
+        
+        session_id = init_data.get('session_id', f"{api_key}_{datetime.utcnow().timestamp()}")
+        conversation_id = init_data.get('conversation_id')
+        
+        conversation = None
+        history = []
+        
+        if conversation_id:
+            conversation = db.query(database.Conversation).filter(
+                database.Conversation.id == conversation_id,
+                database.Conversation.chatbot_id == chatbot.id
+            ).first()
+            
+            if conversation:
+                print(f"[WebSocket] Resuming conversation {conversation_id}")
+                messages = db.query(database.Message).filter(
+                    database.Message.conversation_id == conversation_id
+                ).order_by(database.Message.created_at.desc()).limit(10).all()
+                messages.reverse()
+                
+                await websocket.send_json({
+                    'type': 'history',
+                    'messages': [{
+                        'id': msg.id,
+                        'role': msg.role,
+                        'content': msg.content,
+                        'sender_type': msg.sender_type or 'ai',
+                        'sender_email': msg.sender_email,
+                        'created_at': msg.created_at.isoformat()
+                    } for msg in messages],
+                    'mode': conversation.mode or 'ai'
+                })
+                
+                history = [{'role': msg.role, 'content': msg.content} for msg in messages]
+        
+        if not conversation:
+            conversation = database.Conversation(
+                chatbot_id=chatbot.id,
+                session_id=session_id
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+            print(f"[WebSocket] Created new conversation {conversation.id}")
+            
+            await websocket.send_json({
+                'type': 'complete',
+                'conversation_id': conversation.id
+            })
+        
+        manager.conversation_connections[conversation.id] = websocket
+        print(f"[WebSocket] Conversation {conversation.id} connected, mode: {conversation.mode}")
+        
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
             user_message = message_data.get('message', '')
+            print(f"[WebSocket] Received user message: {user_message[:50]}...")
             
             db_message = database.Message(
                 conversation_id=conversation.id,
@@ -191,6 +199,7 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                     )
                     db.add(db_response)
                     db.commit()
+                    print(f"[WebSocket] Response sent and saved")
             except Exception as e:
                 error_message = f"Failed to generate response: {str(e)}"
                 print(f"[Chat Error] {error_message}")
@@ -200,11 +209,14 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
                 })
     
     except WebSocketDisconnect:
-        if conversation.id in manager.conversation_connections:
+        print(f"[WebSocket] Client disconnected")
+        if conversation and conversation.id in manager.conversation_connections:
             del manager.conversation_connections[conversation.id]
     except Exception as e:
-        print(f"WebSocket error: {e}")
-        if conversation.id in manager.conversation_connections:
+        print(f"[WebSocket] Error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        if conversation and conversation.id in manager.conversation_connections:
             del manager.conversation_connections[conversation.id]
 
 async def handle_support_websocket(websocket: WebSocket, ticket_id: int, support_email: str, db: Session):
