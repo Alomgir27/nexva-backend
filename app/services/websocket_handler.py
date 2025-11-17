@@ -161,28 +161,43 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             history.append({'role': 'user', 'content': user_message})
             
             full_response = ""
-            async for chunk in chat_service.stream_chat(chatbot.id, user_message, history):
-                full_response += chunk
+            try:
+                async for chunk in chat_service.stream_chat(chatbot.id, user_message, history):
+                    if chunk.startswith("Error:"):
+                        await websocket.send_json({
+                            'type': 'error',
+                            'message': chunk
+                        })
+                        break
+                    full_response += chunk
+                    await websocket.send_json({
+                        'type': 'chunk',
+                        'text': chunk
+                    })
+                
+                if full_response:
+                    await websocket.send_json({
+                        'type': 'complete',
+                        'response': full_response,
+                        'conversation_id': conversation.id
+                    })
+                    
+                    history.append({'role': 'assistant', 'content': full_response})
+                    
+                    db_response = database.Message(
+                        conversation_id=conversation.id,
+                        role='assistant',
+                        content=full_response
+                    )
+                    db.add(db_response)
+                    db.commit()
+            except Exception as e:
+                error_message = f"Failed to generate response: {str(e)}"
+                print(f"[Chat Error] {error_message}")
                 await websocket.send_json({
-                    'type': 'chunk',
-                    'text': chunk
+                    'type': 'error',
+                    'message': error_message
                 })
-            
-            await websocket.send_json({
-                'type': 'complete',
-                'response': full_response,
-                'conversation_id': conversation.id
-            })
-            
-            history.append({'role': 'assistant', 'content': full_response})
-            
-            db_response = database.Message(
-                conversation_id=conversation.id,
-                role='assistant',
-                content=full_response
-            )
-            db.add(db_response)
-            db.commit()
     
     except WebSocketDisconnect:
         if conversation.id in manager.conversation_connections:

@@ -68,6 +68,11 @@ Guidelines:
                     "stream": True
                 }
             ) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    yield f"Error: Ollama API returned {response.status_code}. Response: {error_text.decode()[:200]}"
+                    return
+                    
                 async for line in response.aiter_lines():
                     if line:
                         try:
@@ -77,8 +82,12 @@ Guidelines:
                                 yield data['message']['content']
                         except json.JSONDecodeError:
                             continue
+        except httpx.ConnectError as e:
+            yield f"Error: Cannot connect to Ollama at {settings.OLLAMA_HOST}. Make sure Ollama is running. Details: {str(e)}"
+        except httpx.ReadTimeout as e:
+            yield f"Error: Request to Ollama timed out. The model might be loading or overloaded. Details: {str(e)}"
         except Exception as e:
-            yield f"Error: {str(e)}"
+            yield f"Error: Unexpected error occurred: {str(e)}"
     
     async def close(self):
         await self.client.aclose()
