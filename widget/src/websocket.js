@@ -114,6 +114,7 @@ export const WebSocketManager = {
       this.isPlayingAudio = false;
       this.currentAudio = null;
       this.updatePlaybackStatus(false);
+      VoiceChat.resumeRecognition();
       return;
     }
 

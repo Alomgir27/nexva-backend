@@ -13,6 +13,33 @@ export const VoiceChat = {
   isSpeaking: false,
   onInterrupt: null,
   interruptSent: false,
+  isPaused: false,
+  
+  pauseRecognition: function() {
+    if (this.recognition && this.isRecording && !this.isPaused) {
+      this.isPaused = true;
+      try {
+        this.recognition.stop();
+      } catch (e) {
+        console.log('[VoiceChat] Error pausing recognition:', e);
+      }
+    }
+  },
+  
+  resumeRecognition: function() {
+    if (this.isPaused && this.continuousMode) {
+      this.isPaused = false;
+      setTimeout(() => {
+        if (!this.isRecording && this.continuousMode) {
+          try {
+            this.recognition.start();
+          } catch (e) {
+            console.log('[VoiceChat] Error resuming recognition:', e);
+          }
+        }
+      }, 300);
+    }
+  },
   
   isSupported: function() {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);

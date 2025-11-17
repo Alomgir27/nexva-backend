@@ -17,13 +17,14 @@ export const UI = {
       </button>
       <div class="nexva-chat-window" id="nexvaChatWindow">
         <div class="nexva-chat-header">
-          <div class="nexva-chat-header-title">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-            </svg>
-            <h3>${config.headerText}</h3>
-          </div>
-          <div class="nexva-chat-header-actions">
+          <div class="nexva-chat-header-top">
+            <div class="nexva-chat-header-title">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+              </svg>
+              <h3>${config.headerText}</h3>
+            </div>
+            <div class="nexva-chat-header-actions">
             <button class="nexva-chat-icon-btn" id="nexvaDock" aria-label="Dock" title="Dock">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM3 19V5h11v14H3zm18 0h-5V5h5v14z"/></svg>
             </button>
@@ -33,14 +34,20 @@ export const UI = {
             <button class="nexva-chat-icon-btn nexva-chat-close" id="nexvaChatClose" aria-label="Close" title="Close">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
+            </div>
           </div>
-        </div>
-        <div class="nexva-chat-tabs">
-          <button class="nexva-chat-tab active" data-tab="text">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
-            <span>Text</span>
-          </button>
-          ${config.enableVoice ? '<button class="nexva-chat-tab" data-tab="voice"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg><span>Voice</span></button>' : ''}
+          <div class="nexva-mode-switcher" id="nexvaModeSwitcher">
+            <button class="nexva-mode-btn active" data-mode="ai" title="AI Assistant">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
+              </svg>
+            </button>
+            <button class="nexva-mode-btn" data-mode="human" title="Human Support">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="nexva-chat-messages" id="nexvaChatMessages">
           <div class="nexva-chat-message assistant">
@@ -48,37 +55,13 @@ export const UI = {
           </div>
         </div>
         <div class="nexva-chat-input-area">
-          <div class="nexva-mode-switcher" id="nexvaModeSwitcher">
-            <button class="nexva-mode-btn active" data-mode="ai" data-tooltip="Switch to AI Assistant">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
-              </svg>
-              <span>AI Assistant</span>
-            </button>
-            <button class="nexva-mode-btn" data-mode="human" data-tooltip="Talk to Human Support">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-              <span>Human Support</span>
-            </button>
-          </div>
           <div class="nexva-chat-actions" id="nexvaChatActions" style="display:none;"></div>
-          <div class="nexva-chat-input-row" id="nexvaTextInputRow">
-            ${config.enableVoice ? '<button class="nexva-chat-voice-prompt" id="nexvaVoicePrompt" aria-label="Voice input"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button>' : ''}
+          <div class="nexva-chat-input-row" id="nexvaChatInputRow">
+            ${config.enableVoice ? '<button class="nexva-chat-voice-btn" id="nexvaVoiceBtn" aria-label="Voice input" title="Click to start voice input" data-voice-active="false"><svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 15c1.66 0 2.99-1.34 2.99-3L15 6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.42 2.72 6.23 6 6.72V22h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button>' : ''}
             <input type="text" class="nexva-chat-input" id="nexvaChatInput" placeholder="${config.placeholder}" autocomplete="off">
-            <button class="nexva-chat-btn" id="nexvaChatSend" aria-label="Send message">
+            <button class="nexva-chat-btn" id="nexvaChatSend" aria-label="Send message" title="Send message">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
             </button>
-          </div>
-          <div class="nexva-chat-input-row" id="nexvaVoiceInputRow" style="display:none;">
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
-              <div style="display: flex; justify-content: center;">
-                <button class="nexva-chat-btn" id="nexvaVoiceToggle" aria-label="Start voice chat" style="width: 60px; height: 60px;">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
-                </button>
-              </div>
-              <div style="text-align: center; font-size: 12px; color: ${config.primaryColor};" id="nexvaVoiceStatus">Click microphone to start</div>
-            </div>
           </div>
         </div>
       </div>
@@ -186,28 +169,6 @@ export const UI = {
       chatButton.style.display = 'flex';
       btn.innerHTML = this.dockIcon;
       btn.setAttribute('title', 'Dock');
-    }
-  },
-  
-  switchTab: function(tab) {
-    const tabs = document.querySelectorAll('.nexva-chat-tab');
-    tabs.forEach(t => {
-      t.classList.remove('active');
-      if (t.dataset.tab === tab) t.classList.add('active');
-    });
-    
-    const textInputRow = document.getElementById('nexvaTextInputRow');
-    const voiceInputRow = document.getElementById('nexvaVoiceInputRow');
-    const modeSwitcher = document.getElementById('nexvaModeSwitcher');
-    
-    if (tab === 'voice') {
-      textInputRow.style.display = 'none';
-      voiceInputRow.style.display = 'flex';
-      if (modeSwitcher) modeSwitcher.style.display = 'none';
-    } else {
-      textInputRow.style.display = 'flex';
-      voiceInputRow.style.display = 'none';
-      if (modeSwitcher) modeSwitcher.style.display = 'flex';
     }
   },
   

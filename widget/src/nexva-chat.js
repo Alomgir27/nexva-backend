@@ -54,8 +54,7 @@ export const NexvaChat = {
     const dockBtn = document.getElementById('nexvaDock');
     const sendBtn = document.getElementById('nexvaChatSend');
     const input = document.getElementById('nexvaChatInput');
-    const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
-    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
+    const voiceBtn = document.getElementById('nexvaVoiceBtn');
     
     console.log('[Nexva] Attaching event listeners...');
     console.log('[Nexva] Button element:', button);
@@ -91,17 +90,9 @@ export const NexvaChat = {
       });
     }
     
-    if (voicePromptBtn) {
-      voicePromptBtn.addEventListener('click', () => this.toggleVoicePrompt());
+    if (voiceBtn) {
+      voiceBtn.addEventListener('click', () => this.toggleVoiceMode());
     }
-    
-    if (voiceToggleBtn) {
-      voiceToggleBtn.addEventListener('click', () => this.toggleVoiceChat());
-    }
-    
-    document.querySelectorAll('.nexva-chat-tab').forEach(tab => {
-      tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
-    });
     
     document.querySelectorAll('.nexva-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => this.switchMode(btn.dataset.mode));
@@ -110,67 +101,32 @@ export const NexvaChat = {
     console.log('[Nexva] Event listeners attached successfully');
   },
   
-  switchTab: function(tab) {
-    UI.switchTab(tab);
-    if (tab === 'voice') {
-      if (this.voicePromptActive) {
-        this.voicePromptActive = false;
-        WebSocketManager.onResponseComplete = null;
-        VoiceChat.stop();
-        const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
-        if (voicePromptBtn) voicePromptBtn.classList.remove('recording');
-      }
-    } else {
+  voiceActive: false,
+  
+  toggleVoiceMode: function() {
+    const voiceBtn = document.getElementById('nexvaVoiceBtn');
+    const input = document.getElementById('nexvaChatInput');
+    
+    if (this.voiceActive) {
+      this.voiceActive = false;
+      voiceBtn.dataset.voiceActive = 'false';
+      voiceBtn.setAttribute('title', 'Click to start voice input');
       this.stopVoiceChat();
-    }
-  },
-  
-  voicePromptActive: false,
-  
-  toggleVoicePrompt: function() {
-    const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
-    if (this.voicePromptActive) {
-      this.voicePromptActive = false;
-      WebSocketManager.onResponseComplete = null;
-      VoiceChat.stop();
-      voicePromptBtn.classList.remove('recording');
+      if (input) input.disabled = false;
     } else {
-      this.voicePromptActive = true;
-      voicePromptBtn.classList.add('recording');
-      
-      WebSocketManager.onResponseComplete = () => {
-        if (this.voicePromptActive && VoiceChat.continuousMode) {
-          setTimeout(() => {
-            VoiceChat.start((transcript) => {
-              this.sendVoiceMessage(transcript);
-            }, true);
-          }, 500);
-        }
-      };
-      
-      VoiceChat.start((transcript) => {
-        this.sendVoiceMessage(transcript);
-      }, true);
-    }
-  },
-  
-  voiceChatActive: false,
-  
-  toggleVoiceChat: function() {
-    if (this.voiceChatActive) {
-      this.stopVoiceChat();
-    } else {
+      this.voiceActive = true;
+      voiceBtn.dataset.voiceActive = 'true';
+      voiceBtn.setAttribute('title', 'Click to stop voice input');
+      if (input) input.disabled = true;
       this.startVoiceChat();
     }
   },
   
   startVoiceChat: function() {
-    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
-    const voiceStatus = document.getElementById('nexvaVoiceStatus');
+    const voiceBtn = document.getElementById('nexvaVoiceBtn');
     
-    this.voiceChatActive = true;
-    voiceToggleBtn.classList.add('recording');
-    voiceStatus.textContent = 'Listening...';
+    this.voiceActive = true;
+    if (voiceBtn) voiceBtn.classList.add('recording');
     
     const protocol = this.config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = this.config.apiUrl.replace(/^https?:\/\//, '');
@@ -180,7 +136,7 @@ export const NexvaChat = {
     
     this.voiceChatWs.onopen = () => {
       WebSocketManager.onResponseComplete = () => {
-        if (this.voiceChatActive && VoiceChat.continuousMode) {
+        if (this.voiceActive && VoiceChat.continuousMode) {
           setTimeout(() => {
             VoiceChat.start((transcript) => {
               if (this.voiceChatWs.readyState === WebSocket.OPEN && !isSending) {
@@ -196,13 +152,13 @@ export const NexvaChat = {
         }
       };
       
-            VoiceChat.onInterrupt = () => {
-              if (this.voiceChatWs && this.voiceChatWs.readyState === WebSocket.OPEN) {
-                this.voiceChatWs.send(JSON.stringify({ type: 'interrupt' }));
-              }
-              WebSocketManager.stopAllAudio();
-              Messaging.hideTyping();
-            };
+      VoiceChat.onInterrupt = () => {
+        if (this.voiceChatWs && this.voiceChatWs.readyState === WebSocket.OPEN) {
+          this.voiceChatWs.send(JSON.stringify({ type: 'interrupt' }));
+        }
+        WebSocketManager.stopAllAudio();
+        Messaging.hideTyping();
+      };
       
       VoiceChat.start((transcript) => {
         if (this.voiceChatWs.readyState === WebSocket.OPEN && !isSending) {
@@ -221,6 +177,7 @@ export const NexvaChat = {
       
       if (data.type === "response_start") {
         VoiceChat.interruptSent = false;
+        VoiceChat.pauseRecognition();
       } else if (data.type === "text_chunk") {
         Messaging.appendToLastMessage(data.text);
       } else if (data.type === "audio_chunk") {
@@ -229,12 +186,13 @@ export const NexvaChat = {
       } else if (data.type === "response_end") {
         Messaging.finalizeMessage();
         isSending = false;
-        if (this.voiceChatActive && WebSocketManager.onResponseComplete) {
+        if (this.voiceActive && WebSocketManager.onResponseComplete) {
           WebSocketManager.onResponseComplete();
         }
       } else if (data.type === "error") {
         Messaging.addMessage('system', `❌ ${data.message}`);
         Messaging.hideTyping();
+        VoiceChat.resumeRecognition();
         isSending = false;
       }
     };
@@ -245,17 +203,17 @@ export const NexvaChat = {
     };
     
     this.voiceChatWs.onclose = () => {
-      if (this.voiceChatActive) {
+      if (this.voiceActive) {
         this.stopVoiceChat();
       }
     };
   },
   
+  
   stopVoiceChat: function() {
-    const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
-    const voiceStatus = document.getElementById('nexvaVoiceStatus');
+    const voiceBtn = document.getElementById('nexvaVoiceBtn');
     
-    this.voiceChatActive = false;
+    this.voiceActive = false;
     WebSocketManager.onResponseComplete = null;
     VoiceChat.onInterrupt = null;
     
@@ -267,11 +225,9 @@ export const NexvaChat = {
     
     WebSocketManager.stopAllAudio();
     
-    if (voiceToggleBtn) {
-      voiceToggleBtn.classList.remove('recording');
-    }
-    if (voiceStatus) {
-      voiceStatus.textContent = 'Click microphone to start';
+    if (voiceBtn) {
+      voiceBtn.classList.remove('recording');
+      voiceBtn.dataset.voiceActive = 'false';
     }
     VoiceChat.stop();
   },
