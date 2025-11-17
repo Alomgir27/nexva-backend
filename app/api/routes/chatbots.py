@@ -68,9 +68,14 @@ def get_chatbot_stats(
         database.Conversation.session_id.isnot(None)
     ).scalar() or 0
     
+    total_messages = db.query(database.Message).join(database.Conversation).filter(
+        database.Conversation.chatbot_id == chatbot_id
+    ).count()
+    
     return {
         "total_conversations": total_conversations,
-        "unique_customers": unique_customers
+        "unique_customers": unique_customers,
+        "total_messages": total_messages
     }
 
 @router.put("/{chatbot_id}/voice")
