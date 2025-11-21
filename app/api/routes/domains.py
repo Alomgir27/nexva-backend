@@ -41,7 +41,6 @@ def _get_domain_with_auth(domain_id: int, current_user: database.User, db: Sessi
 @router.post("", response_model=schemas.DomainResponse)
 async def create_domain(
     domain_data: schemas.DomainCreate,
-    background_tasks: BackgroundTasks,
     current_user: database.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
@@ -62,8 +61,19 @@ async def create_domain(
     db.commit()
     db.refresh(job)
     
+    print(f"🔍 Created scrape job {job.id} for domain {domain.id} ({domain_data.url})")
+    
+    # Run scraping in a separate thread to avoid blocking the main event loop
+    import threading
     from app.api.routes.scraping import run_domain_scraping
-    background_tasks.add_task(run_domain_scraping, job.id, domain.id, domain_data.url)
+    
+    thread = threading.Thread(
+        target=run_domain_scraping,
+        args=(job.id, domain.id, domain_data.url),
+        daemon=True
+    )
+    thread.start()
+    print(f"✅ Scraping thread started for job {job.id}")
     
     return domain
 
@@ -144,6 +154,7 @@ def list_documents(
 @router.post("/{domain_id}/documents", response_model=schemas.DocumentResponse)
 async def upload_document(
     domain_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: database.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
@@ -214,7 +225,68 @@ async def upload_document(
     db.commit()
     db.refresh(document)
     
+    background_tasks.add_task(process_and_index_document, document.id, chatbot.id, domain.id, original_filename, db)
+    
     return document
+
+def process_and_index_document(document_id: int, chatbot_id: int, domain_id: int, original_filename: str, db: Session):
+    # Re-query to get fresh object in new thread context if needed, or pass IDs
+    # For simplicity in this context, we'll use a new session if this was a real async worker, 
+    # but here we're just moving it out of the request handler.
+    # Ideally, we should use a new DB session here.
+    
+    new_db = database.SessionLocal()
+    try:
+        document = new_db.query(database.Document).filter(database.Document.id == document_id).first()
+        if not document:
+            return
+
+        from app.services.document_processor import process_document, chunk_text
+        from app.services import search
+        
+        print(f"📄 Processing document: {original_filename}")
+        
+        # Extract text from document
+        content_data = process_document(document.file_path, document.mime_type)
+        
+        if content_data['content']:
+            # Chunk the content
+            chunks = chunk_text(content_data['content'])
+            print(f"📝 Extracted {len(content_data['content'])} chars in {len(chunks)} chunks")
+            
+            # Generate tags
+            tags = search.generate_content_tags(content_data['title'], content_data['content'])
+            
+            # Index each chunk
+            for idx, chunk in enumerate(chunks):
+                doc = {
+                    'url': f"document://{document.id}",
+                    'title': content_data['title'],
+                    'content': chunk,
+                    'chunk_index': idx,
+                    'chatbot_id': chatbot_id,
+                    'domain_id': domain_id,
+                    'document_id': document.id,
+                    'tags': tags
+                }
+                search.index_chatbot_content(chatbot_id, doc)
+            
+            # Update document status
+            document.status = "indexed"
+            new_db.commit()
+            print(f"✅ Document indexed: {original_filename}")
+        else:
+            document.status = "failed"
+            new_db.commit()
+            print(f"⚠️  No content extracted from: {original_filename}")
+            
+    except Exception as e:
+        print(f"❌ Error indexing document {original_filename}: {e}")
+        if document:
+            document.status = "failed"
+            new_db.commit()
+    finally:
+        new_db.close()
 
 @router.delete("/{domain_id}")
 def delete_domain(
@@ -235,6 +307,7 @@ def delete_domain(
     
     db.query(database.ScrapedPage).filter(database.ScrapedPage.domain_id == domain_id).delete()
     db.query(database.ScrapeJob).filter(database.ScrapeJob.domain_id == domain_id).delete()
+    db.query(database.Document).filter(database.Document.domain_id == domain_id).delete()
     
     db.delete(domain)
     db.commit()

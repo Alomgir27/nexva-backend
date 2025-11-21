@@ -17,10 +17,10 @@ OLLAMA_MODEL = "llama3.2:3b"
 CODE_INDICATORS = ['```', 'function', 'class ', 'def ', 'import ', 'const ', 'return ', 'async ', 'SELECT ']
 CODE_KEYWORDS = ['code', 'example', 'how to', 'tutorial', 'syntax', 'implement']
 
-VOICE_SEARCH_RESULT_LIMIT = 4
-VOICE_CONTEXT_RESULT_LIMIT = 2
-STANDARD_CONTEXT_CHARS = 600
-CODE_CONTEXT_CHARS = 1600
+VOICE_SEARCH_RESULT_LIMIT = 3
+VOICE_CONTEXT_RESULT_LIMIT = 5
+STANDARD_CONTEXT_CHARS = 4000
+CODE_CONTEXT_CHARS = 5000
 TTS_SENTENCE_TRIGGER = 1
 TTS_CHAR_TRIGGER = 140
 MIN_TTS_TEXT_LENGTH = 40
@@ -103,15 +103,22 @@ def build_context(results: list, query: str) -> str:
     parts = []
     for i, result in enumerate(results[:VOICE_CONTEXT_RESULT_LIMIT]):
         content = result.get('content', '')
+        title = result.get('title', 'Untitled')
+        url = result.get('url', '')
         content = _limit_text(content, limit)
-        parts.append(f"Source {i+1}:\n{content}")
+        parts.append(f"Source {i+1} ({title}):\n{content}")
     return "\n\n".join(parts)
 
-def create_system_prompt(chatbot_name: str, context: str) -> str:
+def create_system_prompt(chatbot_name: str, context: str, short_answer: bool = True) -> str:
+    length_instruction = "Keep responses conversational, very short, and under 50 words." if short_answer else "Keep responses conversational and under 100 words."
     return f"""You are a helpful AI assistant for {chatbot_name}.
-Only answer with information from the knowledge base context.
-If nothing relevant is provided, clearly say that the knowledge base does not contain that information.
-Keep responses under 60 words (ideally 1-2 sentences) so they sound natural in voice.
+Answer questions strictly using ONLY the context provided below.
+If the context contains pricing, numbers, or specific details, YOU MUST mention them.
+If the exact answer isn't explicitly stated but can be inferred from the context, you may do so carefully.
+If the context mentions a "Free plan" or "Paid plans" without specific numbers, state that.
+If the question is vague, mention what IS available in the context or ask for clarification.
+{length_instruction}
+Do NOT use outside knowledge. If the answer is not in the context, say you don't know.
 
 Context from knowledge base:
 {context if context else "No relevant context found in the knowledge base."}"""
@@ -153,6 +160,9 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
             data = json.loads(message)
             if data.get("type") == "text_query":
                 query = data.get("text", "").strip()
+                top_k = data.get("top_k", 3)
+                short_answer = data.get("short_answer", True)
+                
                 if query:
                     if current_task and not current_task.done():
                         print("🛑 Cancelling previous task")
@@ -164,7 +174,7 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
                     
                     interrupt_flag["interrupted"] = False
                     current_task = asyncio.create_task(
-                        process_query(websocket, query, chatbot, domain_ids, db, interrupt_flag)
+                        process_query(websocket, query, chatbot, domain_ids, db, interrupt_flag, top_k, short_answer)
                     )
             elif data.get("type") == "interrupt":
                 print("🛑 Interrupt received from frontend")
@@ -186,19 +196,18 @@ async def handle_voice_chat(websocket: WebSocket, api_key: str):
             except:
                 pass
 
-async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_ids: list, db, interrupt_flag: dict):
+async def process_query(websocket: WebSocket, text_query: str, chatbot, domain_ids: list, db, interrupt_flag: dict, top_k: int = 3, short_answer: bool = True):
     if websocket.client_state != WebSocketState.CONNECTED:
         return
     
     try:
-        print(f"💬 Query: '{text_query}'")
-        refined_query = await search.extract_search_keywords(text_query)
-        search_query = refined_query or text_query
-        results = await search.search_chatbot_content(chatbot.id, search_query, max_results=VOICE_SEARCH_RESULT_LIMIT)
+        print(f"💬 Query: '{text_query}' (top_k={top_k}, short={short_answer})")
+        # Use the original query directly - our semantic search handles it well
+        results = await search.search_chatbot_content(chatbot.id, text_query, max_results=top_k)
         print(f"🔍 Found {len(results) if results else 0} results")
         
         context = build_context(results or [], text_query)
-        prompt = create_system_prompt(chatbot.name, context)
+        prompt = create_system_prompt(chatbot.name, context, short_answer=short_answer)
         
         await safe_send_json(websocket, {"type": "response_start"})
         

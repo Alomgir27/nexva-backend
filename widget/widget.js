@@ -9,15 +9,27 @@ export { NexvaChat } from './src/nexva-chat.js';
 
 if (typeof window !== 'undefined') {
   window.NexvaChat = (await import('./src/nexva-chat.js')).NexvaChat;
-  
+
   // Auto-initialize from script tag data attributes
   const script = document.currentScript || document.querySelector('script[data-api-key]');
   if (script && script.hasAttribute('data-api-key')) {
     console.log('[Nexva] Auto-initializing from script tag...');
-    
+
     const apiKey = script.getAttribute('data-api-key');
-    const apiUrl = script.getAttribute('data-api-url') || 'http://localhost:8000';
-    
+
+    // Auto-detect API URL from script src
+    let defaultApiUrl = 'https://yueihds3xl383a-5000.proxy.runpod.net';
+    if (script.src) {
+      try {
+        const url = new URL(script.src);
+        defaultApiUrl = `${url.protocol}//${url.host}`;
+      } catch (e) {
+        console.warn('[Nexva] Failed to parse script URL:', e);
+      }
+    }
+
+    const apiUrl = script.getAttribute('data-api-url') || defaultApiUrl;
+
     // Parse preset questions if present
     let presetQuestions = [];
     const presetQuestionsAttr = script.getAttribute('data-preset-questions');
@@ -28,7 +40,7 @@ if (typeof window !== 'undefined') {
         console.warn('[Nexva] Failed to parse preset questions:', e);
       }
     }
-    
+
     // Parse bubble config
     const bubbleConfig = {
       backgroundColor: script.getAttribute('data-bubble-bg') || '#32f08c',
@@ -40,7 +52,7 @@ if (typeof window !== 'undefined') {
       shadow: script.getAttribute('data-bubble-shadow') !== 'false',
       animation: script.getAttribute('data-bubble-animation') || 'pulse'
     };
-    
+
     const config = {
       apiUrl: apiUrl,
       position: script.getAttribute('data-position') || 'bottom-right',
@@ -62,9 +74,9 @@ if (typeof window !== 'undefined') {
       buttonSize: bubbleConfig.size,
       buttonColor: bubbleConfig.backgroundColor
     };
-    
+
     console.log('[Nexva] Initializing with config:', config);
-    
+
     // Wait for DOM to be ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {

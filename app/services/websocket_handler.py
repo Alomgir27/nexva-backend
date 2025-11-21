@@ -137,7 +137,9 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             data = await websocket.receive_text()
             message_data = json.loads(data)
             user_message = message_data.get('message', '')
-            print(f"[WebSocket] Received user message: {user_message[:50]}...")
+            top_k = message_data.get('top_k', 5)
+            short_answer = message_data.get('short_answer', False)
+            print(f"[WebSocket] Received user message: {user_message[:50]}... (top_k={top_k}, short={short_answer})")
             
             db_message = database.Message(
                 conversation_id=conversation.id,
@@ -170,7 +172,7 @@ async def handle_chat_websocket(websocket: WebSocket, api_key: str, db: Session)
             
             full_response = ""
             try:
-                async for chunk in chat_service.stream_chat(chatbot.id, user_message, history):
+                async for chunk in chat_service.stream_chat(chatbot.id, user_message, history, top_k=top_k, short_answer=short_answer):
                     if chunk.startswith("Error:"):
                         await websocket.send_json({
                             'type': 'error',

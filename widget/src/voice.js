@@ -15,13 +15,13 @@ export const VoiceChat = {
   interruptSent: false,
   isPaused: false,
   mediaStream: null,
-  
+
   async requestMicrophoneAccess() {
     try {
       if (this.mediaStream) {
         return true;
       }
-      
+
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -29,7 +29,7 @@ export const VoiceChat = {
           autoGainControl: true
         }
       });
-      
+
       console.log('[VoiceChat] Microphone access granted with echo cancellation');
       return true;
     } catch (error) {
@@ -38,8 +38,8 @@ export const VoiceChat = {
       return false;
     }
   },
-  
-  pauseRecognition: function() {
+
+  pauseRecognition: function () {
     if (this.recognition && this.isRecording && !this.isPaused) {
       this.isPaused = true;
       try {
@@ -49,8 +49,8 @@ export const VoiceChat = {
       }
     }
   },
-  
-  resumeRecognition: function() {
+
+  resumeRecognition: function () {
     if (this.isPaused && this.continuousMode) {
       this.isPaused = false;
       setTimeout(() => {
@@ -64,63 +64,63 @@ export const VoiceChat = {
       }, 500);
     }
   },
-  
-  isSupported: function() {
+
+  isSupported: function () {
     return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
   },
-  
-  start: async function(onTranscript, continuous = false) {
+
+  start: async function (onTranscript, continuous = false) {
     if (!this.isSupported()) {
       Messaging.addMessage('system', '❌ Voice input is not supported in your browser. Please use Chrome or Edge.');
       return false;
     }
-    
+
     if (this.isRecording && this.recognition) {
       return true;
     }
-    
+
     const hasAccess = await this.requestMicrophoneAccess();
     if (!hasAccess) {
       return false;
     }
-    
+
     this.continuousMode = continuous;
-    
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     this.recognition = new SpeechRecognition();
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
     this.recognition.maxAlternatives = 1;
-    
+
     this.finalTranscript = '';
     this.currentMessageIndex = -1;
     this.messageSent = false;
     this.interruptSent = false;
-    
+
     this.recognition.onstart = () => {
       this.isRecording = true;
       document.getElementById('nexvaVoiceIndicator').classList.add('active');
-      
+
       if (!this.originalHeaderTitle) {
         const titleElement = document.querySelector('.nexva-chat-header-title h3');
         if (titleElement) {
           this.originalHeaderTitle = titleElement.textContent;
         }
       }
-      
+
       UI.animateHeaderTitle(true, this.originalHeaderTitle);
       this.setListeningEffect();
     };
-    
+
     this.recognition.onresult = (event) => {
       if (this.isPaused) {
         console.log('[VoiceChat] Ignoring result - paused');
         return;
       }
-      
+
       let interimTranscript = '';
-      
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
@@ -129,36 +129,36 @@ export const VoiceChat = {
           interimTranscript += transcript;
         }
       }
-      
+
       const displayText = this.finalTranscript + (interimTranscript ? ' ' + interimTranscript : '');
-      
+
       if (displayText.trim() && this.currentMessageIndex < 0) {
         const container = document.getElementById('nexvaChatMessages');
         Messaging.addMessage('user', '');
         const messages = container.querySelectorAll('.nexva-chat-message.user');
         this.currentMessageIndex = messages.length - 1;
       }
-      
+
       this.updateUserMessage(displayText);
-      
+
       if (displayText.trim()) {
         if (!this.isSpeaking) {
           this.isSpeaking = true;
           this.updateMicrophoneColor(true);
         }
-        
+
         if (this.onInterrupt && !this.interruptSent) {
           this.interruptSent = true;
           this.onInterrupt();
         }
       }
-      
+
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
-      
+
       if (displayText.trim() && !this.messageSent) {
         this.silenceTimer = setTimeout(() => {
           if (this.messageSent) return;
-          
+
           const textToSend = (this.finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
           if (textToSend) {
             this.messageSent = true;
@@ -166,7 +166,7 @@ export const VoiceChat = {
             onTranscript(textToSend);
             this.finalTranscript = '';
             this.currentMessageIndex = -1;
-            
+
             if (this.recognition) {
               this.recognition.stop();
             }
@@ -174,77 +174,93 @@ export const VoiceChat = {
         }, 2000);
       }
     };
-    
+
     this.recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
+      // Only log and show errors that are not expected
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.error('Speech recognition error:', event.error);
         if (this.currentMessageIndex >= 0) {
           this.removeUserMessage();
         }
         Messaging.addMessage('system', '❌ Voice recognition error. Please try again.');
+        this.cleanup();
+      } else {
+        // These are expected errors during normal operation (silence or intentional stopping)
+        console.log('[VoiceChat] Expected event:', event.error);
       }
-      this.cleanup();
     };
-    
+
     this.recognition.onend = () => {
       if (this.silenceTimer) {
         clearTimeout(this.silenceTimer);
         this.silenceTimer = null;
       }
-      
+
       this.isRecording = false;
       this.finalTranscript = '';
       this.currentMessageIndex = -1;
       this.messageSent = false;
       this.isSpeaking = false;
-      
+
       this.updateMicrophoneColor(false);
-      
+
       const indicator = document.getElementById('nexvaVoiceIndicator');
       if (indicator) {
         indicator.classList.remove('active');
       }
-      
+
       UI.animateHeaderTitle(false, this.originalHeaderTitle);
+
+      // Auto-restart if we are in continuous mode and not explicitly paused
+      if (this.continuousMode && !this.isPaused) {
+        console.log('[VoiceChat] Auto-restarting recognition...');
+        setTimeout(() => {
+          try {
+            this.recognition.start();
+          } catch (e) {
+            console.log('[VoiceChat] Restart error:', e);
+          }
+        }, 100);
+      }
     };
-    
+
     this.recognition.start();
     return true;
   },
-  
-  updateUserMessage: function(content) {
+
+  updateUserMessage: function (content) {
     if (this.currentMessageIndex < 0) return;
-    
+
     const container = document.getElementById('nexvaChatMessages');
     const messages = container.querySelectorAll('.nexva-chat-message.user');
     const targetMessage = messages[this.currentMessageIndex];
-    
+
     if (targetMessage) {
       const contentDiv = targetMessage.querySelector('.nexva-chat-message-content');
       if (contentDiv) {
         contentDiv.textContent = content;
       }
     }
-    
+
     Messaging.scrollToBottom();
   },
-  
-  removeUserMessage: function() {
+
+  removeUserMessage: function () {
     if (this.currentMessageIndex < 0) return;
-    
+
     const container = document.getElementById('nexvaChatMessages');
     const messages = container.querySelectorAll('.nexva-chat-message.user');
     const targetMessage = messages[this.currentMessageIndex];
-    
+
     if (targetMessage) {
       targetMessage.remove();
     }
   },
-  
-  updateMicrophoneColor: function(isSpeaking) {
+
+  updateMicrophoneColor: function (isSpeaking) {
     const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
     const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
-    
+
     if (isSpeaking) {
       if (voicePromptBtn) {
         voicePromptBtn.style.background = '#ef4444';
@@ -273,11 +289,11 @@ export const VoiceChat = {
       }
     }
   },
-  
-  setListeningEffect: function() {
+
+  setListeningEffect: function () {
     const voicePromptBtn = document.getElementById('nexvaVoicePrompt');
     const voiceToggleBtn = document.getElementById('nexvaVoiceToggle');
-    
+
     if (voicePromptBtn && voicePromptBtn.classList.contains('recording')) {
       voicePromptBtn.style.animation = 'subtlePulse 2s infinite';
       voicePromptBtn.style.boxShadow = '0 0 0 rgba(79, 70, 229, 0.4)';
@@ -287,20 +303,20 @@ export const VoiceChat = {
       voiceToggleBtn.style.boxShadow = '0 0 0 rgba(79, 70, 229, 0.4)';
     }
   },
-  
-  stop: function() {
+
+  stop: function () {
     this.continuousMode = false;
     this.cleanup();
     if (this.currentMessageIndex >= 0) {
       this.removeUserMessage();
     }
   },
-  
-  cleanup: function() {
+
+  cleanup: function () {
     if (this.recognition) {
       try {
         this.recognition.stop();
-      } catch (e) {}
+      } catch (e) { }
       this.recognition = null;
     }
     if (this.mediaStream) {

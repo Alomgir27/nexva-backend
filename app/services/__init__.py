@@ -12,8 +12,7 @@ from app.services.search import (
     init_elasticsearch,
     init_chatbot_index,
     index_chatbot_content,
-    search_chatbot_content,
-    generate_content_tags
+    search_chatbot_content
 )
 
 __all__ = [
@@ -28,7 +27,6 @@ __all__ = [
     "init_elasticsearch",
     "init_chatbot_index",
     "index_chatbot_content",
-    "search_chatbot_content",
-    "generate_content_tags"
+    "search_chatbot_content"
 ]
 

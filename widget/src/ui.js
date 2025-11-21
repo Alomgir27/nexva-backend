@@ -5,8 +5,8 @@ export const UI = {
   fullscreenExitIcon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>',
   dockIcon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM3 19V5h11v14H3zm18 0h-5V5h5v14z"/></svg>',
   dockExitIcon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h11v11H3zm7 2H5v7h5V5zm4 0v7h5V5h-5zM3 15h11v6H3zm7 2H5v2h5v-2zm4 0v2h5v-2h-5z"/></svg>',
-  
-  createWidget: function(config) {
+
+  createWidget: function (config) {
     const container = document.createElement('div');
     container.className = 'nexva-chat-container';
     container.innerHTML = `
@@ -25,6 +25,9 @@ export const UI = {
               <h3>${config.headerText}</h3>
             </div>
             <div class="nexva-chat-header-actions">
+            <button class="nexva-chat-icon-btn" id="nexvaNewChat" aria-label="New Chat" title="New Chat">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+            </button>
             <button class="nexva-chat-icon-btn" id="nexvaDock" aria-label="Dock" title="Dock">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM3 19V5h11v14H3zm18 0h-5V5h5v14z"/></svg>
             </button>
@@ -67,17 +70,23 @@ export const UI = {
       </div>
       <div class="nexva-chat-voice-indicator" id="nexvaVoiceIndicator">
         <div class="nexva-chat-voice-wave"><span></span><span></span><span></span><span></span></div>
-        <span>Listening...</span>
+        <span id="nexvaVoiceStatusText">Listening...</span>
+        <button class="nexva-voice-interrupt-btn" id="nexvaVoiceInterruptBtn" title="Tap to Interrupt">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                <path d="M6 6h12v12H6z" />
+            </svg>
+            Stop & Speak
+        </button>
       </div>
     `;
     document.body.appendChild(container);
   },
-  
-  toggleChat: function(isOpen) {
+
+  toggleChat: function (isOpen) {
     const window = document.getElementById('nexvaChatWindow');
     console.log('[Nexva UI] toggleChat called, isOpen:', isOpen);
     console.log('[Nexva UI] Window element:', window);
-    
+
     if (window) {
       if (isOpen) {
         window.classList.add('open');
@@ -94,15 +103,15 @@ export const UI = {
     }
   },
 
-  resetLayoutState: function() {
+  resetLayoutState: function () {
     const window = document.getElementById('nexvaChatWindow');
     const fullscreenBtn = document.getElementById('nexvaFullscreen');
     const dockBtn = document.getElementById('nexvaDock');
     const chatButton = document.getElementById('nexvaChatButton');
-    
+
     this.isFullscreen = false;
     this.isDocked = false;
-    
+
     if (window) {
       window.classList.remove('fullscreen', 'docked');
     }
@@ -118,21 +127,21 @@ export const UI = {
       chatButton.style.display = 'flex';
     }
   },
-  
-  toggleFullscreen: function() {
+
+  toggleFullscreen: function () {
     const window = document.getElementById('nexvaChatWindow');
     const btn = document.getElementById('nexvaFullscreen');
-    
+
     if (!window || !btn) {
       return;
     }
-    
+
     if (this.isDocked) {
       this.toggleDock();
     }
-    
+
     this.isFullscreen = !this.isFullscreen;
-    
+
     if (this.isFullscreen) {
       window.classList.add('fullscreen');
       btn.innerHTML = this.fullscreenExitIcon;
@@ -143,22 +152,22 @@ export const UI = {
       btn.setAttribute('title', 'Fullscreen');
     }
   },
-  
-  toggleDock: function() {
+
+  toggleDock: function () {
     const window = document.getElementById('nexvaChatWindow');
     const btn = document.getElementById('nexvaDock');
     const chatButton = document.getElementById('nexvaChatButton');
-    
+
     if (!window || !btn || !chatButton) {
       return;
     }
-    
+
     if (this.isFullscreen) {
       this.toggleFullscreen();
     }
-    
+
     this.isDocked = !this.isDocked;
-    
+
     if (this.isDocked) {
       window.classList.add('docked');
       chatButton.style.display = 'none';
@@ -171,18 +180,18 @@ export const UI = {
       btn.setAttribute('title', 'Dock');
     }
   },
-  
-  updateActions: function(config, conversationId, supportRequested, onRequestSupport) {
+
+  updateActions: function (config, conversationId, supportRequested, onRequestSupport) {
     if (!config.enableHumanSupport || !conversationId) {
       document.getElementById('nexvaChatActions').style.display = 'none';
       return;
     }
-    
+
     const actionsDiv = document.getElementById('nexvaChatActions');
     actionsDiv.style.display = 'none';
   },
-  
-  updateMode: function(mode) {
+
+  updateMode: function (mode) {
     const buttons = document.querySelectorAll('.nexva-mode-btn');
     buttons.forEach(btn => {
       if (btn.dataset.mode === mode) {
@@ -192,17 +201,17 @@ export const UI = {
       }
     });
   },
-  
-  animateHeaderTitle: function(isListening, originalTitle) {
+
+  animateHeaderTitle: function (isListening, originalTitle) {
     const titleElement = document.querySelector('.nexva-chat-header-title h3');
     if (!titleElement) return;
-    
+
     titleElement.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-    
+
     if (isListening) {
       titleElement.style.transform = 'translateY(-20px)';
       titleElement.style.opacity = '0';
-      
+
       setTimeout(() => {
         titleElement.innerHTML = `
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -211,7 +220,7 @@ export const UI = {
           </div>
         `;
         titleElement.style.transform = 'translateY(20px)';
-        
+
         setTimeout(() => {
           titleElement.style.transform = 'translateY(0)';
           titleElement.style.opacity = '1';
@@ -220,16 +229,34 @@ export const UI = {
     } else {
       titleElement.style.transform = 'translateY(-20px)';
       titleElement.style.opacity = '0';
-      
+
       setTimeout(() => {
         titleElement.textContent = originalTitle;
         titleElement.style.transform = 'translateY(20px)';
-        
+
         setTimeout(() => {
           titleElement.style.transform = 'translateY(0)';
           titleElement.style.opacity = '1';
         }, 50);
       }, 300);
+    }
+  },
+
+  updateVoiceStatus: function (status) {
+    const statusText = document.getElementById('nexvaVoiceStatusText');
+    const interruptBtn = document.getElementById('nexvaVoiceInterruptBtn');
+    const indicator = document.getElementById('nexvaVoiceIndicator');
+
+    if (statusText) {
+      if (status === 'speaking') {
+        statusText.textContent = 'Speaking...';
+        if (interruptBtn) interruptBtn.style.display = 'flex';
+        if (indicator) indicator.classList.add('speaking');
+      } else {
+        statusText.textContent = 'Listening...';
+        if (interruptBtn) interruptBtn.style.display = 'none';
+        if (indicator) indicator.classList.remove('speaking');
+      }
     }
   }
 };

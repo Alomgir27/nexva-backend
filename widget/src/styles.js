@@ -1,5 +1,5 @@
 export const Styles = {
-  inject: function(config) {
+  inject: function (config) {
     const style = document.createElement('style');
     const primaryColor = config.primaryColor;
     const hoverColor = '#0fdc78';
@@ -15,7 +15,7 @@ export const Styles = {
     const buttonSize = config.buttonSize;
     const buttonColor = config.buttonColor;
     const buttonBorderRadius = config.borderRadius === '0px' ? '0px' : '50%';
-    
+
     style.textContent = `
       * { box-sizing: border-box; }
       
@@ -539,6 +539,45 @@ export const Styles = {
       .nexva-chat-voice-indicator.active { 
         display: flex; 
       }
+      .nexva-chat-voice-indicator.speaking .nexva-chat-voice-wave {
+        display: none;
+      }
+      
+      .nexva-voice-interrupt-btn {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: rgba(239, 68, 68, 0.9); /* Red background */
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 24px;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(8px);
+        margin-left: 12px;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 10;
+      }
+      
+      .nexva-voice-interrupt-btn:hover {
+        background: #dc2626;
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+      }
+      
+      .nexva-voice-interrupt-btn:active {
+        transform: translateY(0) scale(0.98);
+      }
+      
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(10px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      
       .nexva-chat-voice-wave { 
         display: flex; 
         gap: 4px; 

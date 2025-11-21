@@ -2,6 +2,7 @@ from datetime import datetime
 from app import database
 
 def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
+    print(f"🚀 Starting scraping background task: job_id={job_id}, domain_id={domain_id}, url={start_url}")
     from app.services.scraper import WebScraper
     db = database.SessionLocal()
     try:
@@ -9,9 +10,10 @@ def run_domain_scraping(job_id: int, domain_id: int, start_url: str):
         domain = db.query(database.Domain).filter(database.Domain.id == domain_id).first()
         
         if not job or not domain:
-            print(f"Job or domain not found: job_id={job_id}, domain_id={domain_id}")
+            print(f"❌ Job or domain not found: job_id={job_id}, domain_id={domain_id}")
             return
         
+        print(f"📋 Starting scraping for: {start_url}")
         job.status = "running"
         domain.status = "scraping"
         db.commit()

@@ -3,10 +3,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import random
+import threading
 try:
     import undetected_chromedriver as uc
 except ImportError:
     uc = None
+# uc = None # Force standard selenium for speed
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
 import time
@@ -28,6 +30,9 @@ class WebScraper:
         self.failed_attempts = {}
         self.max_retries = 3
         
+    # Global lock for driver initialization to prevent parallel patching/downloads
+    _driver_lock = threading.Lock()
+
     def _get_driver(self):
         user_agent = random.choice([
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -69,15 +74,35 @@ class WebScraper:
             opts.page_load_strategy = 'normal'
             opts.add_experimental_option("prefs", content_block_prefs)
 
-        if uc:
-            options = uc.ChromeOptions()
-            apply_shared_options(options)
-            driver = uc.Chrome(options=options, use_subprocess=True)
-        else:
-            options = Options()
-            apply_shared_options(options)
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=options)
+        # Use lock to ensure sequential initialization
+        with self._driver_lock:
+            if uc:
+                print("   - Using undetected_chromedriver")
+                options = uc.ChromeOptions()
+                apply_shared_options(options)
+                
+                import time
+                start_time = time.time()
+                print(f"   - 🕒 Starting uc.Chrome at {start_time}")
+                
+                try:
+                    driver = uc.Chrome(options=options, use_subprocess=True)
+                    print(f"   - ✅ uc.Chrome started in {time.time() - start_time:.2f}s")
+                except Exception as e:
+                    print(f"   - ❌ uc.Chrome failed: {e}")
+                    raise e
+            else:
+                print("   - Using standard selenium webdriver")
+                options = Options()
+                apply_shared_options(options)
+                
+                print("   - Checking/Installing Chrome driver...")
+                # Cache driver for 7 days to avoid network calls on every run
+                driver_path = ChromeDriverManager(cache_valid_range=7).install()
+                print(f"   - Driver path: {driver_path}")
+                
+                service = Service(driver_path)
+                driver = webdriver.Chrome(service=service, options=options)
 
         driver.set_script_timeout(60)
         driver.implicitly_wait(10)
@@ -118,7 +143,7 @@ class WebScraper:
             'content': text[:50000]
         }
     
-    def _chunk_text(self, text: str, chunk_size: int = 512) -> List[str]:
+    def _chunk_text(self, text: str, chunk_size: int = 1000) -> List[str]:
         words = text.split()
         chunks = []
         current_chunk = []
@@ -328,20 +353,11 @@ class WebScraper:
                 pass
     
     def scrape_domain(self, start_url: str, domain_id: int, db) -> List[database.ScrapedPage]:
-        driver = self._get_driver()
-        to_visit = [start_url]
-        scraped_pages = []
-        base_domain = urlparse(start_url).netloc
-        
-        domain = db.query(database.Domain).filter(database.Domain.id == domain_id).first()
-        chatbot_id = domain.chatbot_id
-        
-        max_iterations = self.max_pages * 3
-        iteration_count = 0
-        consecutive_failures = 0
-        max_consecutive_failures = 10
-        
         try:
+            print("🚗 Initializing Chrome driver...")
+            driver = self._get_driver()
+            print("✅ Driver initialized")
+            
             while to_visit and len(scraped_pages) < self.max_pages and iteration_count < max_iterations:
                 iteration_count += 1
                 
@@ -365,8 +381,11 @@ class WebScraper:
                 self.visited.add(normalized_url)
                 
                 try:
+                    print(f"🌐 Navigating to: {url}")
                     driver.get(url)
+                    print(f"⏳ Waiting for page load: {url}")
                     time.sleep(2)
+                    print(f"📄 Page loaded: {driver.title}")
                     
                     # Check if blocked by anti-bot (more specific detection)
                     page_title = driver.title.lower()

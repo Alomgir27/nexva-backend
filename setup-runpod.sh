@@ -160,7 +160,7 @@ echo "   • Stop server: pkill -f 'uvicorn app.main:app'"
 echo ""
 
 source venv/bin/activate
-nohup uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4 --log-level info > nohup.out 2>&1 &
+nohup uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2 --log-level info > nohup.out 2>&1 &
 BACKEND_PID=$!
 
 echo "   Waiting for backend to start..."

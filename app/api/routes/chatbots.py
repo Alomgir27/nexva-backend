@@ -97,3 +97,21 @@ def update_chatbot_voice(
     db.refresh(chatbot)
     return {"message": "Voice updated successfully", "voice_id": chatbot.voice_id}
 
+@router.get("/{chatbot_id}/support-team")
+def get_chatbot_support_team(
+    chatbot_id: int,
+    current_user: database.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    chatbot = db.query(database.Chatbot).filter(
+        database.Chatbot.id == chatbot_id,
+        database.Chatbot.user_id == current_user.id
+    ).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    support_members = db.query(database.SupportTeamMember).filter(
+        database.SupportTeamMember.chatbot_id == chatbot_id
+    ).all()
+    
+    return support_members

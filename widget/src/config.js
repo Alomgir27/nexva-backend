@@ -1,6 +1,6 @@
 export const Config = {
   defaults: {
-    apiUrl: 'http://localhost:8000',
+    apiUrl: 'https://yueihds3xl383a-5000.proxy.runpod.net',
     position: 'bottom-right',
     primaryColor: '#32f08c',
     headerText: 'Nexva',
@@ -15,8 +15,8 @@ export const Config = {
     buttonSize: '60px',
     buttonColor: null
   },
-  
-  init: function(apiKey, options) {
+
+  init: function (apiKey, options) {
     options = options || {};
     const primaryColor = options.primaryColor || this.defaults.primaryColor;
     return {

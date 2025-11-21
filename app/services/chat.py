@@ -7,18 +7,23 @@ class ChatService:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=60.0)
     
-    async def get_context(self, chatbot_id: int, query: str) -> str:
-        results = await search_chatbot_content(chatbot_id, query, max_results=5)
+    async def get_context(self, chatbot_id: int, query: str, max_results: int = 5) -> str:
+        print(f"[ChatService] Searching for context with query: '{query}' (top_k={max_results})")
+        results = await search_chatbot_content(chatbot_id, query, max_results=max_results)
         
         if not results:
+            print(f"[ChatService] No context found for query: '{query}'")
             return ""
         
+        print(f"[ChatService] Found {len(results)} context chunks")
         context_parts = []
-        for result in results:
+        for i, result in enumerate(results):
             content = result.get('content', '')
             title = result.get('title', 'Untitled')
             url = result.get('url', '')
+            score = result.get('_search_score', 0)
             
+            print(f"[ChatService] Result {i+1}: '{title}' (score: {score:.2f})")
             context_parts.append(f"[{title}]\nSource: {url}\n{content}")
         
         return "\n\n---\n\n".join(context_parts)
@@ -27,32 +32,36 @@ class ChatService:
         self,
         chatbot_id: int,
         message: str,
-        history: List[Dict[str, str]]
+        history: List[Dict[str, str]],
+        top_k: int = 5,
+        short_answer: bool = False
     ) -> AsyncGenerator[str, None]:
-        context = await self.get_context(chatbot_id, message)
+        context = await self.get_context(chatbot_id, message, max_results=top_k)
+        
+        length_instruction = "Keep your answer very short and concise." if short_answer else "Provide clear, concise answers."
         
         if context:
-            system_prompt = f"""You are a helpful AI assistant. Answer questions naturally and directly using the context provided below. 
-
+            system_prompt = f"""You are a helpful AI assistant. You must answer questions strictly using ONLY the context provided below.
+            
 Guidelines:
-- Provide clear, concise answers
-- When relevant information includes URLs or links, always include them in your response
-- Format your responses with markdown for better readability (use **bold**, lists, code blocks when appropriate)
-- If the user asks for links or resources, provide them
-- Be conversational and friendly
-- Never mention "context", "information provided", or "according to" - just answer confidently
+- {length_instruction}
+- Do NOT use outside knowledge.
+- If the exact answer is not in the context, say you don't know, or summarize what IS available related to the topic.
+- If the question is vague (e.g. "price"), mention any pricing details found in the context or ask for clarification.
+- When relevant information includes URLs or links, always include them in your response.
+- Format your responses with markdown for better readability (use **bold**, lists, code blocks when appropriate).
+- Never mention "context", "information provided", or "according to" - just answer confidently based on the data.
 
 Context:
 {context}"""
         else:
-            system_prompt = """You are a helpful AI assistant. 
-
+            system_prompt = """You are a helpful AI assistant.
+            
 Guidelines:
-- Provide clear, helpful responses
-- Format your responses with markdown for better readability
-- If you don't have specific information, be honest and suggest where the user might find it
-- Be conversational and friendly
-- If appropriate, suggest checking the official website or documentation"""
+- {length_instruction}
+- Since no specific context was found, answer generally but be honest if you don't know.
+- Format your responses with markdown for better readability.
+- Be conversational and friendly."""
         
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(history[-10:])

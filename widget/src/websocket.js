@@ -1,6 +1,7 @@
 import { Messaging } from './messaging.js';
 import { Utils } from './utils.js';
 import { VoiceChat } from './voice.js';
+import { UI } from './ui.js';
 
 export const WebSocketManager = {
   ws: null,
@@ -8,18 +9,18 @@ export const WebSocketManager = {
   onResponseComplete: null,
   audioQueue: [],
   isPlayingAudio: false,
-  
-  connect: function(config, onConversationUpdate, existingConversationId = null) {
+
+  connect: function (config, onConversationUpdate, existingConversationId = null) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
-    
+
     const protocol = config.apiUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = config.apiUrl.replace(/^https?:\/\//, '');
     this.ws = new WebSocket(`${protocol}//${host}/ws/chat/${config.apiKey}`);
-    
+
     if (existingConversationId) {
       this.conversationId = existingConversationId;
     }
-    
+
     this.ws.onopen = () => {
       console.log('[WebSocket] Connected to server');
       const initMessage = {
@@ -31,10 +32,10 @@ export const WebSocketManager = {
       }
       this.ws.send(JSON.stringify(initMessage));
     };
-    
+
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      
+
       if (data.type === 'history') {
         Messaging.clearMessages();
         data.messages.forEach(msg => {
@@ -71,18 +72,18 @@ export const WebSocketManager = {
         }
       }
     };
-    
+
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       Messaging.addMessage('system', '❌ Connection error. Please try again.');
     };
-    
+
     this.ws.onclose = () => console.log('WebSocket closed');
   },
-  
-  sendMessage: function(message) {
+
+  sendMessage: function (message) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ 
+      this.ws.send(JSON.stringify({
         message: message,
         session_id: Utils.generateSessionId()
       }));
@@ -90,27 +91,27 @@ export const WebSocketManager = {
     }
     return false;
   },
-  
-  close: function() {
+
+  close: function () {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
   },
-  
-  queueAudio: function(audioBlob) {
+
+  queueAudio: function (audioBlob) {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     audio.setAttribute('sinkId', 'default');
-    
+
     this.audioQueue.push({ audio, url: audioUrl });
-    
+
     if (!this.isPlayingAudio) {
       this.playNextAudio();
     }
   },
-  
-  playNextAudio: function() {
+
+  playNextAudio: function () {
     if (this.audioQueue.length === 0) {
       this.isPlayingAudio = false;
       this.currentAudio = null;
@@ -121,34 +122,42 @@ export const WebSocketManager = {
 
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
-    VoiceChat.pauseRecognition();
+    // VoiceChat.pauseRecognition(); // Removed to allow barge-in
     VoiceChat.interruptSent = false;
-    
+
     const audioData = this.audioQueue.shift();
     const audio = audioData.audio;
     const url = audioData.url;
-    
+
     this.currentAudio = audio;
-    
+
+    // Ensure we can interrupt this specific audio instance
     audio.onended = () => {
       URL.revokeObjectURL(url);
+      this.currentAudio = null;
       this.playNextAudio();
     };
-    
+
     audio.onerror = () => {
       URL.revokeObjectURL(url);
+      this.currentAudio = null;
       this.playNextAudio();
     };
-    
+
     audio.play().catch(err => {
       console.error('Audio play failed:', err);
       URL.revokeObjectURL(url);
+      this.currentAudio = null;
       this.playNextAudio();
     });
   },
-  
-  updatePlaybackStatus: function(isPlaying) {
+
+  updatePlaybackStatus: function (isPlaying) {
     const voiceStatus = document.getElementById('nexvaVoiceStatus');
+
+    // Update the new UI helper
+    UI.updateVoiceStatus(isPlaying ? 'speaking' : 'listening');
+
     if (voiceStatus) {
       if (isPlaying) {
         voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Start speaking to interrupt</span>';
@@ -159,21 +168,26 @@ export const WebSocketManager = {
       }
     }
   },
-  
-  stopAllAudio: function() {
+
+  stopAllAudio: function () {
+    console.log('[WebSocket] Stopping all audio');
     if (this.currentAudio) {
       this.currentAudio.pause();
+      this.currentAudio.currentTime = 0; // Reset position
       this.currentAudio = null;
     }
-    
-    this.audioQueue.forEach(({audio, url}) => {
+
+    this.audioQueue.forEach(({ audio, url }) => {
       audio.pause();
       URL.revokeObjectURL(url);
     });
     this.audioQueue = [];
     this.isPlayingAudio = false;
     this.updatePlaybackStatus(false);
-    VoiceChat.resumeRecognition();
+
+    // Ensure recognition is active
+    if (!VoiceChat.isRecording) {
+      VoiceChat.resumeRecognition();
+    }
   }
 };
-
