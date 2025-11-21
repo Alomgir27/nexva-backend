@@ -52,11 +52,14 @@ echo ""
 echo "📦 Installing Elasticsearch..."
 if ! pgrep -f "org.elasticsearch.bootstrap.Elasticsearch" > /dev/null 2>&1; then
     if ! command -v elasticsearch &> /dev/null; then
-        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch 2>/dev/null | apt-key add - >/dev/null 2>&1
-        echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic-8.x.list
+        # Modern GPG key handling
+        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg 2>/dev/null
+        echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list > /dev/null
+        
         apt-get update -qq 2>/dev/null
         apt-get install -y elasticsearch >/dev/null 2>&1
         
+        # Optimized config for low-resource environments
         cat > /etc/elasticsearch/elasticsearch.yml << EOF
 cluster.name: nexva-cluster
 node.name: nexva-node
@@ -69,6 +72,10 @@ xpack.security.enrollment.enabled: false
 xpack.security.http.ssl.enabled: false
 xpack.security.transport.ssl.enabled: false
 discovery.type: single-node
+# Resource limits
+indices.memory.index_buffer_size: 50mb
+thread_pool.write.queue_size: 100
+thread_pool.search.queue_size: 100
 EOF
         
         chown -R elasticsearch:elasticsearch /var/lib/elasticsearch /var/log/elasticsearch /etc/elasticsearch
@@ -78,21 +85,28 @@ EOF
     sleep 2
     
     rm -f /etc/elasticsearch/elasticsearch.keystore 2>/dev/null || true
-    sysctl -w vm.max_map_count=262144 >/dev/null 2>&1 || true
     
-    echo "   🚀 Starting Elasticsearch..."
+    if ! sysctl -w vm.max_map_count=262144 >/dev/null 2>&1; then
+         echo "   ⚠️  Warning: Failed to set vm.max_map_count. Elasticsearch might be unstable."
+    fi
+    
+    echo "   🚀 Starting Elasticsearch (Heap: 512m)..."
+    # Limit memory to prevent crashes
+    export ES_JAVA_OPTS="-Xms512m -Xmx512m"
+    
     runuser -u elasticsearch -- /usr/share/elasticsearch/bin/elasticsearch -d -p /tmp/elasticsearch.pid 2>/dev/null || \
-    su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk /usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null
+    su -s /bin/bash elasticsearch -c "ES_JAVA_HOME=/usr/share/elasticsearch/jdk ES_JAVA_OPTS=\"-Xms512m -Xmx512m\" /usr/share/elasticsearch/bin/elasticsearch -d" 2>/dev/null
     
     echo "   Waiting for Elasticsearch..."
-    for i in {1..20}; do
+    for i in {1..30}; do
         if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
             echo "   ✅ Elasticsearch ready"
             break
         fi
         sleep 2
-        if [ $i -eq 20 ]; then
-            echo "   ⚠️  Elasticsearch not responding (non-critical, continuing)"
+        if [ $i -eq 30 ]; then
+            echo "   ⚠️  Elasticsearch took too long. Checking logs..."
+            tail -n 20 /var/log/elasticsearch/nexva-cluster.log 2>/dev/null || echo "   (No logs found)"
         fi
     done
 else
