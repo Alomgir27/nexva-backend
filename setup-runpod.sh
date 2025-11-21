@@ -137,6 +137,18 @@ if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
 fi
 
 echo ""
+echo "🌐 Installing Google Chrome (for scraping)..."
+if ! command -v google-chrome &> /dev/null; then
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - > /dev/null 2>&1
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    apt-get update -qq 2>/dev/null
+    apt-get install -y google-chrome-stable > /dev/null 2>&1
+    echo "   ✅ Chrome installed"
+else
+    echo "   ✅ Chrome already installed"
+fi
+
+echo ""
 echo "📦 Python Virtual Environment..."
 if [ ! -d "venv" ]; then
     python3 -m venv venv
