@@ -122,7 +122,7 @@ export const WebSocketManager = {
 
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
-    // VoiceChat.pauseRecognition(); // Removed to allow barge-in
+    VoiceChat.pauseRecognition(); // Pause listening while AI speaks
     VoiceChat.interruptSent = false;
 
     const audioData = this.audioQueue.shift();
@@ -160,7 +160,7 @@ export const WebSocketManager = {
 
     if (voiceStatus) {
       if (isPlaying) {
-        voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Start speaking to interrupt</span>';
+        voiceStatus.innerHTML = '<span style="opacity: 0.8; font-size: 11px;">Click mic or start speaking to interrupt</span>';
         voiceStatus.style.color = '#0fdc78';
       } else {
         voiceStatus.textContent = 'Listening...';

@@ -51,12 +51,13 @@ export const VoiceChat = {
   },
 
   resumeRecognition: function () {
-    if (this.isPaused && this.continuousMode) {
+    if (this.isPaused) {
       this.isPaused = false;
       setTimeout(() => {
-        if (!this.isRecording && this.continuousMode) {
+        if (!this.isRecording) {
           try {
             this.recognition.start();
+            console.log('[VoiceChat] Recognition resumed (manual or auto)');
           } catch (e) {
             console.log('[VoiceChat] Error resuming recognition:', e);
           }
