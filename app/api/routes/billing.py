@@ -10,11 +10,18 @@ def get_subscription(
     current_user: database.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    # Count user's chatbots
+    chatbot_count = db.query(database.Chatbot).filter(
+        database.Chatbot.user_id == current_user.id
+    ).count()
+    
+    # Free tier limits
     return {
-        "plan": "free",
+        "plan_tier": "free",
         "status": "active",
+        "chatbot_count": chatbot_count,
+        "chatbot_limit": 1,  # Free tier allows 1 chatbots
         "features": {
-            "max_chatbots": 1,
             "max_domains": 5,
             "max_messages": 1000
         }
