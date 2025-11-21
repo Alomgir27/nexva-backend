@@ -301,25 +301,6 @@ class WebScraper:
                                 'tags': tags
                             }
                             search.index_chatbot_content(chatbot_id, doc)
-                        
-                        # Index media transcriptions separately with metadata
-                        for media_trans in media_transcriptions:
-                            media_tags = search.generate_content_tags(
-                                f"{content_data['title']} - {media_trans['type']}", 
-                                media_trans['transcription']
-                            )
-                            media_doc = {
-                                'url': normalized_url,
-                                'title': f"{content_data['title']} - {media_trans['type'].upper()}",
-                                'content': media_trans['transcription'],
-                                'chunk_index': 0,
-                                'chatbot_id': chatbot_id,
-                                'domain_id': domain_id,
-                                'media_type': media_trans['type'],
-                                'media_url': media_trans['url'],
-                                'tags': media_tags
-                            }
-                            search.index_chatbot_content(chatbot_id, media_doc)
                     
                     links = soup.find_all('a', href=True)
                     unique_links = set()
