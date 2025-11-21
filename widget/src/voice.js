@@ -42,8 +42,13 @@ export const VoiceChat = {
   pauseRecognition: function () {
     if (this.recognition && this.isRecording && !this.isPaused) {
       this.isPaused = true;
+      console.log('[VoiceChat] Pausing recognition and microphone');
       try {
         this.recognition.stop();
+        // Stop microphone stream to prevent echo
+        if (this.mediaStream) {
+          this.mediaStream.getTracks().forEach(track => track.enabled = false);
+        }
       } catch (e) {
         console.log('[VoiceChat] Error pausing recognition:', e);
       }
@@ -53,16 +58,21 @@ export const VoiceChat = {
   resumeRecognition: function () {
     if (this.isPaused) {
       this.isPaused = false;
+      // Add longer delay to ensure audio has completely finished
       setTimeout(() => {
         if (!this.isRecording) {
           try {
+            // Re-enable microphone
+            if (this.mediaStream) {
+              this.mediaStream.getTracks().forEach(track => track.enabled = true);
+            }
             this.recognition.start();
             console.log('[VoiceChat] Recognition resumed (manual or auto)');
           } catch (e) {
             console.log('[VoiceChat] Error resuming recognition:', e);
           }
         }
-      }, 500);
+      }, 1000); // Increased from 500ms to 1000ms
     }
   },
 
