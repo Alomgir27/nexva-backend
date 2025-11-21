@@ -83,6 +83,23 @@ class WebScraper:
                 options = uc.ChromeOptions()
                 apply_shared_options(options)
                 
+                # Try to find Chrome binary in common locations
+                chrome_paths = [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/google-chrome-stable',
+                    '/usr/bin/chromium-browser',
+                    '/usr/bin/chromium'
+                ]
+                chrome_binary = None
+                for path in chrome_paths:
+                    if os.path.exists(path):
+                        chrome_binary = path
+                        break
+                
+                if chrome_binary:
+                    options.binary_location = chrome_binary
+                    print(f"   - Chrome binary: {chrome_binary}")
+                
                 import time
                 start_time = time.time()
                 print(f"   - 🕒 Starting uc.Chrome at {start_time}")
