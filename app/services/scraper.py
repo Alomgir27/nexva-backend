@@ -76,6 +76,8 @@ class WebScraper:
 
         # Use lock to ensure sequential initialization
         with self._driver_lock:
+            driver = None
+            
             if uc:
                 print("   - Using undetected_chromedriver")
                 options = uc.ChromeOptions()
@@ -90,8 +92,11 @@ class WebScraper:
                     print(f"   - ✅ uc.Chrome started in {time.time() - start_time:.2f}s")
                 except Exception as e:
                     print(f"   - ❌ uc.Chrome failed: {e}")
-                    raise e
-            else:
+                    print("   - 🔄 Falling back to standard selenium...")
+                    driver = None  # Ensure we fall through to standard selenium
+            
+            # Fallback to standard selenium if uc failed or not available
+            if driver is None:
                 print("   - Using standard selenium webdriver")
                 options = Options()
                 apply_shared_options(options)
@@ -357,6 +362,7 @@ class WebScraper:
         to_visit = [start_url]
         scraped_pages = []
         base_domain = urlparse(start_url).netloc
+        driver = None  # Initialize driver to None
         
         domain = db.query(database.Domain).filter(database.Domain.id == domain_id).first()
         chatbot_id = domain.chatbot_id
@@ -532,8 +538,16 @@ class WebScraper:
                     consecutive_failures += 1
                     continue
         
+        except Exception as e:
+            print(f"❌ Driver initialization failed: {e}")
+        
         finally:
-            driver.quit()
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
         
         return scraped_pages
+
 
