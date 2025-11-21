@@ -353,6 +353,19 @@ class WebScraper:
                 pass
     
     def scrape_domain(self, start_url: str, domain_id: int, db) -> List[database.ScrapedPage]:
+        # Initialize variables
+        to_visit = [start_url]
+        scraped_pages = []
+        base_domain = urlparse(start_url).netloc
+        
+        domain = db.query(database.Domain).filter(database.Domain.id == domain_id).first()
+        chatbot_id = domain.chatbot_id
+        
+        max_iterations = self.max_pages * 3
+        iteration_count = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 10
+
         try:
             print("🚗 Initializing Chrome driver...")
             driver = self._get_driver()
