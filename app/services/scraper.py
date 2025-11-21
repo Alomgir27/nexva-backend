@@ -102,8 +102,7 @@ class WebScraper:
                 apply_shared_options(options)
                 
                 print("   - Checking/Installing Chrome driver...")
-                # Cache driver for 7 days to avoid network calls on every run
-                driver_path = ChromeDriverManager(cache_valid_range=7).install()
+                driver_path = ChromeDriverManager().install()
                 print(f"   - Driver path: {driver_path}")
                 
                 service = Service(driver_path)
