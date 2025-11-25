@@ -122,7 +122,13 @@ export const WebSocketManager = {
 
     this.isPlayingAudio = true;
     this.updatePlaybackStatus(true);
-    VoiceChat.pauseRecognition(); // Pause listening while AI speaks
+    
+    // Ensure recognition is PAUSED before playing audio to prevent self-triggering
+    if (VoiceChat.isRecording) {
+      console.log('[VoiceChat] Pausing recognition to prevent self-detection during TTS playback');
+      VoiceChat.pauseRecognition();
+    }
+    
     VoiceChat.interruptSent = false;
 
     const audioData = this.audioQueue.shift();
@@ -135,12 +141,24 @@ export const WebSocketManager = {
     audio.onended = () => {
       URL.revokeObjectURL(url);
       this.currentAudio = null;
+      
+      // Check if queue is empty before resuming
+      if (this.audioQueue.length === 0) {
+        console.log('[VoiceChat] Audio queue finished, resuming recognition');
+        VoiceChat.resumeRecognition();
+      }
+      
       this.playNextAudio();
     };
 
     audio.onerror = () => {
       URL.revokeObjectURL(url);
       this.currentAudio = null;
+      
+      if (this.audioQueue.length === 0) {
+         VoiceChat.resumeRecognition();
+      }
+      
       this.playNextAudio();
     };
 
@@ -148,6 +166,11 @@ export const WebSocketManager = {
       console.error('Audio play failed:', err);
       URL.revokeObjectURL(url);
       this.currentAudio = null;
+      
+      if (this.audioQueue.length === 0) {
+         VoiceChat.resumeRecognition();
+      }
+      
       this.playNextAudio();
     });
   },

@@ -10,6 +10,8 @@ SMTP_USER = os.getenv("SMTP_USER", "noreply@nexva.ai")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@nexva.ai")
 
+from app.core.config import settings
+
 def send_email(to_email: str, subject: str, body: str, html_body: str = None):
     try:
         msg = MIMEMultipart('alternative')
@@ -40,7 +42,7 @@ def send_support_invite(email: str, name: str, chatbot_name: str, invited_by: st
 
 You can now respond to customer support tickets through the Nexva dashboard.
 
-Login at: http://localhost:3000/login
+Login at: {settings.FRONTEND_URL}/login
 
 Best regards,
 Nexva Team"""
@@ -52,7 +54,7 @@ Nexva Team"""
             <p>Hello {name},</p>
             <p><strong>{invited_by}</strong> has invited you to join the support team for <strong>{chatbot_name}</strong>.</p>
             <p>You can now respond to customer support tickets through the Nexva dashboard.</p>
-            <p><a href="http://localhost:3000/login" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Login to Dashboard</a></p>
+            <p><a href="{settings.FRONTEND_URL}/login" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Login to Dashboard</a></p>
             <p>Best regards,<br>Nexva Team</p>
         </body>
     </html>
@@ -68,7 +70,7 @@ def send_new_ticket_alert(support_emails: List[str], ticket_id: int, chatbot_nam
 Chatbot: {chatbot_name}
 Message: {preview}
 
-View and respond: http://localhost:3000/dashboard/support
+View and respond: {settings.FRONTEND_URL}/dashboard/support
 
 Nexva Team"""
 
@@ -80,7 +82,7 @@ Nexva Team"""
             <div style="background-color: #f5f5f5; padding: 15px; border-left: 4px solid #4F46E5; margin: 20px 0;">
                 <p style="margin: 0;">{preview}</p>
             </div>
-            <p><a href="http://localhost:3000/dashboard/support" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Ticket</a></p>
+            <p><a href="{settings.FRONTEND_URL}/dashboard/support" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Ticket</a></p>
             <p>Best regards,<br>Nexva Team</p>
         </body>
     </html>

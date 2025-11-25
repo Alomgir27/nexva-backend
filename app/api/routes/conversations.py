@@ -72,13 +72,20 @@ async def request_support(
     ).order_by(database.Message.created_at.desc()).first()
     
     if support_members and chatbot:
-        from app.services import email as email_service
-        email_service.send_new_ticket_alert(
-            [m.email for m in support_members],
-            ticket.id,
-            chatbot.name,
-            last_message.content if last_message else "New support request"
-        )
+        print(f"[Support] Sending new ticket alert to {len(support_members)} members")
+        try:
+            from app.services import email as email_service
+            email_service.send_new_ticket_alert(
+                [m.email for m in support_members],
+                ticket.id,
+                chatbot.name,
+                last_message.content if last_message else "New support request"
+            )
+            print(f"[Support] Alert sent successfully")
+        except Exception as e:
+            print(f"[Support] Failed to send alert: {e}")
+    else:
+        print(f"[Support] No support members found for chatbot {conversation.chatbot_id}")
     
     return {"ticket_id": ticket.id, "message": "Support requested"}
 
@@ -126,6 +133,7 @@ async def switch_conversation_mode(
             ).first()
             
             if support_members and chatbot:
+                print(f"[Support] Sending switch-mode alert to {len(support_members)} members")
                 last_message = db.query(database.Message).filter(
                     database.Message.conversation_id == conversation_id
                 ).order_by(database.Message.created_at.desc()).first()
@@ -137,6 +145,8 @@ async def switch_conversation_mode(
                     chatbot.name,
                     last_message.content if last_message else "New support request"
                 )
+            else:
+                print(f"[Support] No support members found for switch-mode alert")
         else:
             conversation.ticket_id = active_ticket.id
     

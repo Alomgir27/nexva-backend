@@ -171,6 +171,18 @@ export const NexvaChat = {
 
     this.voiceChatWs.onopen = () => {
       const handleTranscript = (transcript) => {
+        // If in human mode, send to support via text WebSocket
+        if (this.currentMode === 'human') {
+          Messaging.addMessage('user', transcript);
+          WebSocketManager.sendMessage(transcript);
+          
+          // Restart listening
+          setTimeout(() => {
+             if (this.voiceActive) VoiceChat.start(handleTranscript, true);
+          }, 200);
+          return;
+        }
+
         if (this.voiceChatWs.readyState === WebSocket.OPEN) {
           // If we are interrupting, stop any current audio
           WebSocketManager.stopAllAudio();

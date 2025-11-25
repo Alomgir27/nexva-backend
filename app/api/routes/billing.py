@@ -20,7 +20,7 @@ def get_subscription(
         "plan_tier": "free",
         "status": "active",
         "chatbot_count": chatbot_count,
-        "chatbot_limit": 1,  # Free tier allows 1 chatbots
+        "chatbot_limit": 1,  # Free tier allows 1 chatbot
         "features": {
             "max_domains": 5,
             "max_messages": 1000

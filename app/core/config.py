@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     
     OLLAMA_HOST: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:3b"
+
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     CORS_ORIGINS: list = ["*"]
     
