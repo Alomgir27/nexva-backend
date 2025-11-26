@@ -2,6 +2,8 @@
 
 AI-powered chatbot platform with voice chat, document processing, and real-time websocket support.
 
+🌐 **Live Demo**: https://nexva.pages.dev/
+
 ## Features
 
 - 🤖 **AI Chatbot** - LLM-powered conversations using Ollama (Llama 3.2)
